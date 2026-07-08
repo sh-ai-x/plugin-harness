@@ -49,7 +49,7 @@ Rubric: 4 independent sources. **PASS** (≥3 required, rubric ≥ 75).
 ## Gate 5 — socratic-deepen (5/5 PASS)
 
 - Q1 [PASS]: failure mode — no plugin-creation tool exists
-- Q2 [PASS]: first user = you; smallest action `/dev-kit:plan-plugin --mode <A|B> <idea-or-company>`
+- Q2 [PASS]: first user = you; smallest action `/plugin-harness:plan --mode <A|B> <idea-or-company>`
 - Q3 [PASS (sharpen×1)]: kill-shot — interview + AI research + plugin gen, ≤2 person-days
 - Q4 [PASS]: prior try — wrote CC skill, ported to Codex; learned dual plugin.json is hand-ported
 - Q5 [PASS]: next build — plugin dry-run tester

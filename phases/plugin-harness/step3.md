@@ -10,7 +10,7 @@ Given an idea or company (from CLI), AI searches the web for evidence and fills 
 - LLM with internet access
 
 ## Outputs
-- `/dev-kit:plan-plugin --mode B <idea-or-company>` command
+- `/plugin-harness:plan --mode B <idea-or-company>` command
 - `interview.json` with AI-filled answers + evidence URLs
 - `logs/<session-id>.md` (verbatim AI conversation — every user prompt + every assistant response + retrieved evidence URLs)
 - Unit tests: each question has evidence, no hallucination, format match, log capture

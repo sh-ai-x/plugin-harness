@@ -19,7 +19,7 @@ Validate the full pipeline end-to-end on 1 real idea, within the ≤2 person-day
 
 ## TDD order (scenario-style)
 1. Pick 1 real idea (e.g., "GitHub PR triage")
-2. Run mode A: `/dev-kit:plan-plugin --mode A "GitHub PR triage"`
+2. Run mode A: `/plugin-harness:plan --mode A "GitHub PR triage"`
 3. Verify all 5 answers are filled
 4. Run mode B on the same idea
 5. Compare mode A vs mode B outputs
