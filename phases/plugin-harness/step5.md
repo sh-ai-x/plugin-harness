@@ -25,7 +25,7 @@ Given `interview.json`, emit a valid Codex plugin source tree at `src/`. Must in
 - Generated `.codex-plugin/plugin.json` is valid per Codex spec
 - Generated `skills/<name>/SKILL.md` is valid per Codex skills spec
 - Plugin installs cleanly in Codex (smoke test: install + invoke `/<skill-name>`)
-- Plugin metadata matches what was generated for Claude Code (consistency check upstream — links to step 6)
+- Plugin metadata matches what was generated for Claude Code (consistency check upstream — links to step 6). Even in the no-MCP case (Codex-only transport), `plugin.json`'s `primary_entry_point` must equal the `primary_entry_point` field in `interview.json` (step 6 verifies this even when `.mcp.json` is absent)
 - Step 5 emits BOTH `src/README.md` and a root-level `README.md` (identical content; root copy is for local repo discoverability — there is no zip step in this pipeline)
 
 ## TDD order
@@ -33,7 +33,7 @@ Given `interview.json`, emit a valid Codex plugin source tree at `src/`. Must in
 2. RED: test that SKILL.md is valid per Codex format
 3. RED: test that plugin name and version match across runtimes
 4. GREEN: implement emitter
-5. REFACTOR: share template with step 4 (single source, two format mappings — counters Q4 lesson about hand-ported layouts)
+5. REFACTOR: extract a shared `Metadata` dataclass (fields: `name`, `version`, `primary_entry_point`, `description`) populated from `interview.json`. Both step 4 and step 5 format the same `Metadata` into their respective runtime shapes (Codex `plugin.json` shape vs Claude Code `.mcp.json` shape). The shared module is the single source of truth; only the FORMAT MAPPING differs.
 
 ## Risks
 - Codex spec may change — pin version

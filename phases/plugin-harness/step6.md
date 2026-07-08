@@ -34,12 +34,13 @@ Before the smoke test (step 7), verify that the logs, the plugin source, and the
 ## TDD order
 1. RED: test that all 5 answers are referenced in the generated plugin
 2. RED: test that the logs mention all 5 questions
-3. RED: test that `plugin.json` and `.mcp.json` agree on entry point (both-present case → hard fail)
-4. RED: test that "Codex-only transport" logs WARNING but passes (warning, not skip)
-5. RED: test that "Claude-Code-only transport" logs WARNING but passes
-6. RED: test that step 7 is BLOCKED on hard-fail
-7. GREEN: implement checker
-8. REFACTOR: pluggable check rules
+3. RED: test that `plugin.json` and `.mcp.json` agree on `primary_entry_point` (both-present case → hard fail)
+4. RED: test that "Codex-only transport" logs WARNING but passes (warning, not skip) — verifies `plugin.json`'s `primary_entry_point` matches `interview.json`
+5. RED: test that "Claude-Code-only transport" logs WARNING but passes — verifies `.mcp.json`'s `primary_entry_point` matches `interview.json`
+6. RED: test that "neither file present" HARD-FAILS (no silent pass for missing emitter output)
+7. RED: test that step 7 is BLOCKED on hard-fail
+8. GREEN: implement checker (reads both file outputs + interview.json, compares primary_entry_point, runs all checks)
+9. REFACTOR: pluggable check rules
 
 ## Risks
 - Synonyms / paraphrasing may break the trace — use semantic similarity, not exact match
