@@ -15,17 +15,17 @@ Given `interview.json`, emit a valid Codex plugin source tree at `src/`. Must in
 - `src/.codex-plugin/plugin.json` (with name, version, entry points)
 - `src/skills/<name>/SKILL.md` (Codex format)
 - `src/README.md` (merged usage doc — sole writer, emitted AFTER step 4 completes)
-- `README.md` at repo root (copy of `src/README.md` — required by zip structure in step 7)
+- `README.md` at repo root (copy of `src/README.md` — for local repo discoverability, not for any submission artifact)
 - Unit tests: `plugin.json` schema, SKILL.md format, root README equals `src/README.md`
 
-**Note**: Step 5 runs AFTER step 4 (depends on step 4's CC files existing on disk). Step 5 is the SOLE emitter of `src/README.md`. Step 4 must NOT emit `src/README.md`. This eliminates the merge-order ambiguity flagged in review.
+**Note on ordering**: the only real constraint between step 4 and step 5 is the **writer-exclusion mutex** on `src/README.md` — step 4 must NOT emit it, step 5 is the sole writer. Step 5 does NOT depend on step 4's on-disk output (it reads only `interview.json`, see Inputs above). The two emitters can run in any order as long as the mutex holds.
 
 ## Acceptance criteria
 - Generated `.codex-plugin/plugin.json` is valid per Codex spec
 - Generated `skills/<name>/SKILL.md` is valid per Codex skills spec
 - Plugin installs cleanly in Codex (smoke test: install + invoke `/<skill-name>`)
 - Plugin metadata matches what was generated for Claude Code (consistency check upstream — links to step 6)
-- Step 5 emits BOTH `src/README.md` and a root-level `README.md` (identical content; root copy is what step 7 puts in the zip)
+- Step 5 emits BOTH `src/README.md` and a root-level `README.md` (identical content; root copy is for local repo discoverability — there is no zip step in this pipeline)
 
 ## TDD order
 1. RED: test that emitted `plugin.json` matches Codex schema
@@ -36,4 +36,4 @@ Given `interview.json`, emit a valid Codex plugin source tree at `src/`. Must in
 
 ## Risks
 - Codex spec may change — pin version
-- Field-name diffs vs Claude Code — must be detected (links to step 7 consistency check)
+- Field-name diffs vs Claude Code — must be detected (links to step 6 consistency check)

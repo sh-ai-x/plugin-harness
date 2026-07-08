@@ -6,15 +6,15 @@
 
 - **Idea**: standalone plugin (plugin-harness) that authors dual-runtime (CC + Codex) plugins via 5-question interview
 - **Customer**: plugin authors; first user = repo owner
-- **Situation**: no good tool exists; author hand-rolls 5 questions, dual plugin.json layouts, logs, submission.zip
+- **Situation**: no good tool exists; author hand-rolls 5 questions, dual plugin.json layouts, logs
 - **Cause**: existing tools (cookiecutter, npm init) produce code but not the 5 questions or logs; manual porting is error-prone
-- **Cost**: hours of manual work per plugin, silent runtime breaks, submission rejections
+- **Cost**: hours of manual work per plugin, silent runtime breaks, smoke-test failures from drift
 
 ## Gate 2 — evidence-gate (PASS, 4 sources)
 
 | # | Source | URL | Independent | Use |
 |---|---|---|---|---|
-| 1 | Codex plugin overview | https://developers.openai.com/codex/plugins | yes (official) | 5-question format + submission.zip layout |
+| 1 | Codex plugin overview | https://developers.openai.com/codex/plugins | yes (official) | 5-question format + plugin.json layout |
 | 2 | Codex plugin build | https://developers.openai.com/codex/plugins/build | yes (official) | plugin.json + MCP integration |
 | 3 | Codex skills spec | https://developers.openai.com/codex/skills | yes (official) | SKILL.md structure |
 | 4 | User's prior CC→Codex port (Q4) | first-hand | first-person | dual-runtime pain evidence |
@@ -31,7 +31,7 @@ Rubric: 4 independent sources. **PASS** (≥3 required, rubric ≥ 75).
 **Differentiation (customer language)**:
 - "I can either fill in 5 questions or just give an idea — the tool researches the rest."
 - "I get a plugin that works in Claude Code AND Codex, not just one."
-- "My logs and plugin can't drift — the consistency check catches it before submission."
+- "My logs and plugin can't drift — the consistency check catches it before the smoke test."
 
 **Unit margin**: positive (one-time build, reusable across many plugins, saves hours per plugin).
 
