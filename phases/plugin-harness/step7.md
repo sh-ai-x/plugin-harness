@@ -16,7 +16,7 @@ Before zipping, verify that the logs, the plugin source, and the interview answe
 - Each interview answer appears in the generated SKILL.md body
 - Each SKILL.md feature traces back to an interview answer
 - The logs reference all 5 questions (the conversation actually covered them)
-- The Codex `plugin.json` and Claude Code `.mcp.json` agree on the plugin's primary entry point
+- The Codex `plugin.json` and Claude Code `.mcp.json` agree on the plugin's primary entry point — **CONDITIONAL**: only enforced when both `plugin.json` and `.mcp.json` are present. If `.mcp.json` is absent (Codex-only transport), the check is skipped with an explicit "Codex-only transport" allow-state marker in the consistency report.
 - If any check fails, exit code 1 + clear error
 
 ## TDD order
