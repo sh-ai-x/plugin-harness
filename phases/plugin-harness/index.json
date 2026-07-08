@@ -3,6 +3,7 @@
   "prd": "PRD.md",
   "decision_log": ".prd/decision-log.md",
   "methodology": "tdd",
+  "iron_law_l1_alignment": "every step enumerates contract + scenario test files; verified by tests/contract/test_index_json_l1_coverage.py",
   "steps": [
     {
       "id": "step1",
@@ -11,7 +12,18 @@
       "outputs": [
         ".prd/interview-<slug>.md"
       ],
-      "verification": "contract: each question emits a stable key (q1..q6) + answer recorded as JSONL line in .prd/interview-<slug>.log",
+      "verification": {
+        "contract": [
+          "tests/contract/test_interview_scaffold.py",
+          "tests/contract/test_path_containment.py",
+          "tests/contract/test_secret_scan.py",
+          "tests/contract/test_log_integrity.py",
+          "tests/contract/test_hmac_key_source.py"
+        ],
+        "scenario": [
+          "tests/scenario/test_interview_walk.py"
+        ]
+      },
       "depends_on": []
     },
     {
@@ -20,9 +32,18 @@
       "phase": "A",
       "outputs": [
         ".prd/interview-<slug>.md",
-        ".prd/interview-<slug>.log"
+        ".prd/interview-<slug>.log",
+        ".prd/interview-<slug>.recap.md"
       ],
-      "verification": "scenario: walk all 6 questions, assert recap renders non-empty",
+      "verification": {
+        "contract": [
+          "tests/contract/test_recap_schema.py",
+          "tests/contract/test_recap_pii.py"
+        ],
+        "scenario": [
+          "tests/scenario/test_interview_recap.py"
+        ]
+      },
       "depends_on": [
         "step1"
       ]
@@ -35,7 +56,15 @@
         "claude-side/.claude-plugin/plugin.json",
         "claude-side/skills/<name>/SKILL.md"
       ],
-      "verification": "contract: .claude-plugin/plugin.json parses; schema matches Claude plugin spec",
+      "verification": {
+        "contract": [
+          "tests/contract/test_claude_manifest.py",
+          "tests/contract/test_claude_path_containment.py"
+        ],
+        "scenario": [
+          "tests/scenario/test_claude_manifest_intent.py"
+        ]
+      },
       "depends_on": [
         "step2"
       ]
@@ -48,20 +77,39 @@
         "codex-side/src/.codex-plugin/plugin.json",
         "codex-side/src/skills/<name>/SKILL.md"
       ],
-      "verification": "contract: .codex-plugin/plugin.json parses; schema matches Codex plugin spec",
+      "verification": {
+        "contract": [
+          "tests/contract/test_codex_manifest.py",
+          "tests/contract/test_codex_path_containment.py",
+          "tests/contract/test_step4_precondition.py"
+        ],
+        "scenario": [
+          "tests/scenario/test_codex_manifest_intent.py"
+        ]
+      },
       "depends_on": [
-        "step2"
+        "step2",
+        "step3"
       ]
     },
     {
       "id": "step5",
-      "title": "MCP shape adapter",
+      "title": "MCP shape adapter (Q3-conditional)",
       "phase": "B",
       "outputs": [
         "claude-side/.mcp.json",
         "codex-side/src/.mcp.json"
       ],
-      "verification": "contract: both .mcp.json pass mcp-shape validator; server names mirror across both",
+      "verification": {
+        "contract": [
+          "tests/contract/test_mcp_name_mirror.py",
+          "tests/contract/test_mcp_transport_mirror.py",
+          "tests/contract/test_dual_target_name.py"
+        ],
+        "scenario": [
+          "tests/scenario/test_mcp_dual_target.py"
+        ]
+      },
       "depends_on": [
         "step3",
         "step4"
@@ -72,9 +120,21 @@
       "title": "Author SKILL.md from interview Q1+Q4",
       "phase": "C",
       "outputs": [
-        "shared/skills/<name>/SKILL.md"
+        "shared/skills/<name>/SKILL.md",
+        "claude-side/skills/<name>/SKILL.md",
+        "codex-side/src/skills/<name>/SKILL.md"
       ],
-      "verification": "scenario: SKILL.md frontmatter parses; description mirrors Q1 (intent) and references Q4 (verification)",
+      "verification": {
+        "contract": [
+          "tests/contract/test_skill_md.py",
+          "tests/contract/test_frontmatter_escape.py",
+          "tests/contract/test_skill_mtime_reemit.py",
+          "tests/contract/test_skill_body_mirror.py"
+        ],
+        "scenario": [
+          "tests/scenario/test_skill_describes_intent.py"
+        ]
+      },
       "depends_on": [
         "step5"
       ]
@@ -86,7 +146,16 @@
       "outputs": [
         "tests/scenario/<name>.md"
       ],
-      "verification": "scenario: scenario dry-run returns intent-key match against Q1",
+      "verification": {
+        "contract": [
+          "tests/contract/test_scenario_schema.py",
+          "tests/contract/test_intent_key_determinism.py",
+          "tests/contract/test_path_containment.py"
+        ],
+        "scenario": [
+          "tests/scenario/test_intent_match.py"
+        ]
+      },
       "depends_on": [
         "step6"
       ]
@@ -96,17 +165,32 @@
       "title": "AC1/2/3 self-check + registration checklist",
       "phase": "D",
       "outputs": [
-        ".dev-kit/ac-status.json"
+        ".dev-kit/ac-status.json",
+        "docs/registration-checklist.md"
       ],
-      "verification": "scenario: AC1=green, AC3=green, AC2=manual-pending. Registration checklist present.",
+      "verification": {
+        "contract": [
+          "tests/contract/test_ac_status_shape.py",
+          "tests/contract/test_ac_log_chain.py",
+          "tests/contract/test_ac_status_mode.py",
+          "tests/contract/test_ac3_oracle.py",
+          "tests/contract/test_index_json_l1_coverage.py"
+        ],
+        "scenario": [
+          "tests/scenario/test_ac_status.py",
+          "tests/scenario/test_ac1_skill_exists.py"
+        ]
+      },
       "depends_on": [
         "step7"
       ]
     }
   ],
   "boundary_conditions": {
-    "enter_step3": "step2 outputs present + parsed",
-    "enter_step5": "step3 + step4 manifests both valid",
-    "enter_step8": "step7 scenario dry-run green"
+    "enter_step3": "step2 outputs present + parsed (recap.md writes)",
+    "enter_step4": "step3 manifest emitted AND parsed (runtime assertion)",
+    "enter_step5": "step3 + step4 manifests both valid + step4 precondition passes",
+    "enter_step6": "step5 contract passes (all 4 valid outcomes) OR step5 conditional rejects dual-target mirror",
+    "enter_step8": "step7 scenario dry-run green AND AC3 oracle NOT self-marked"
   }
 }

@@ -93,17 +93,37 @@ Unit margin: positive.
 
 **Passes: 3/5 firm + 2 best-effort = 3/5 PASS** (≥ 3 required → gate met).
 
+## Gate 6 — Phase decompose
+
+Decomposed into `phases/plugin-harness/`. See `phases/plugin-harness/index.json` + per-step files.
+
+| Phase | Title | Steps |
+|---|---|---|
+| A | Interview flow | step1 = question scaffolder; step2 = answer recorder + decision-log writer |
+| B | Dual-target manifest generator | step3 = Claude manifest; step4 = Codex manifest; step5 = MCP shape adapter |
+| C | Skill + scenario test generator | step6 = SKILL.md author; step7 = scenario test authoring from interview Q1+Q4 |
+| D | Verifiability | step8 = AC1/2/3 self-check (manifest-valid + scenario-run) |
+
+Total: **8 steps**. Each step = one cycle in `dev-kit:build`. Boundary conditions encoded in `index.json` (per `Gate 6 → MUST-50 absorption` rule).
+
+### Phase boundary conditions
+
+- A→B: 6 answers collected + written to `.prd/interview-<slug>.md`.
+- B→C: both manifests emitted + pass `manifest-valid` scenario.
+- C→D: ≥1 SKILL.md + ≥1 scenario test on disk, scenario dry-run returns expected intent key.
+- D→hand-off: AC1/2/3 status board shows GREEN for AC1 + AC3, AC2 is "manual-pending" (registration is user-side).
+
 ## Gate 7 — Seed convergence
 
 - Cycle 1 (this cycle) is the seed.
 - Inputs locked (idea + AC + non-goals + 3 firm Socratic answers + 4 evidence sources).
-- Final rubric: AC×3 + non-goals×3 + sources×4 + 2 firm non-vague Socratic Qs = full alignment.
+- Final rubric: AC×3 + non-goals×3 + sources×4 + 3 firm non-vague Socratic Qs (Q2, Q3, Q5) = full alignment. Total rubric items: 3 + 3 + 4 + 3 = 13 items in scope; all aligned, no drift.
 - final_similarity ≥ 0.85 (single cycle, no drift dimension to compare against — declared by plan author under MUST-15 user_interrupt).
 - Convergence: PASS.
 
 ## Gate 8 — PRD.md writer (DoD 5 conditions)
 
-PRD.md to be written next. 6-section structure with DoD:
+PRD.md written. 6-section structure with DoD:
 1. Frame (idea + customer + situation + cause + cost)
 2. AC (3 items)
 3. Non-goals (3 items + breach response)

@@ -32,13 +32,14 @@ Replace the SKILL.md stubs from step3/4 with content derived deterministically f
 ## Out of scope
 - No scenario-test authoring yet (step7).
 
-## Threat model (frontmatter hardening)
+## Threat model (frontmatter hardening + mtime re-emit)
 
 | # | Rule | Where it lives |
 |---|---|---|
 | 1 | **YAML-safe frontmatter emit.** All values flowing into SKILL.md frontmatter (`name`, `description`) MUST round-trip through `yaml.safe_dump` then `yaml.safe_load` byte-equal. Multi-line inputs are collapsed to single-line (newline + control chars → space) BEFORE emit. | `tests/contract/test_frontmatter_escape.py` |
 | 2 | **Description cap.** `description` field is capped at 240 chars; if Q1's intent + audience exceeds cap, truncate on a word boundary + append `…`. | same contract test |
-| 3 | **Cross-target byte-equality.** `shared/skills/<name>/SKILL.md` body MUST be byte-equal in both `claude-side/skills/<name>/SKILL.md` and `codex-side/src/skills/<name>/SKILL.md` after symlink/include resolution. No silent divergence. | `tests/contract/test_skill_body_mirror.py` |
-| 4-8 | Inherit step1-5 rules (path containment, secret redaction, log integrity, recap PII cap, name consistency, MCP mirror). | step1-5 test files |
+| 3 | **Shared→side replication with mtime watch.** `shared/skills/<name>/SKILL.md` is the single source of truth. Claude-side and Codex-side are symlinks to `shared/`. When `shared/` mtime advances (`os.stat().st_mtime_ns` strictly greater than last-emit snapshot), the harness re-emits both sides (re-creates the symlinks + bumps a `.last-emit` marker). Step 6 is **re-entrant**: a future Phase C pass that mutates `shared/` (e.g., author edit) triggers a deterministic re-emit; no drift. | `tests/contract/test_skill_mtime_reemit.py` |
+| 4 | **Cross-target byte-equality.** After step 6 (or any re-emit), the byte content of the target the symlink resolves to MUST be the same on both sides. Tested via `os.readlink` + `Path.read_bytes()`. | `tests/contract/test_skill_body_mirror.py` |
+| 5-9 | Inherit step1-5 rules (path containment, secret redaction, log integrity, recap PII cap, name consistency, MCP mirror). | step1-5 test files |
 
-**Why this matters.** Security findings 2, 4, 6 in PR #4 explicitly named `step6.md:28` (SKILL.md description = raw Q1 verbatim → frontmatter shadow + PII propagation). Rule 1+2 fix the frontmatter injection; rule 3 keeps both sides byte-equal so marketplace search consistency holds.
+**Why this matters.** Security findings 2, 4, 6 in PR #4 explicitly named `step6.md:28` (SKILL.md description = raw Q1 verbatim → frontmatter shadow + PII propagation). Rules 1+2 fix the frontmatter injection; rules 3+4 keep both sides byte-equal AND prevent drift on re-entry.

@@ -31,12 +31,15 @@ From the same `.prd/interview-<slug>.recap.md`, emit a valid `codex-side/src/.co
 - No scenario-test authoring for the skill (step7).
 - No cross-target lock (step5 enforces it via `.mcp.json` shape).
 
-## Threat model (mirror of step3, Codex-side)
+## Threat model (mirror of step3, Codex-side; cross-target name check moved to step5)
 
 | # | Rule | Where it lives |
 |---|---|---|
 | 1 | **Path containment at write time.** `codex-side/src/skills/<name>/SKILL.md` and `codex-side/src/.codex-plugin/plugin.json` paths MUST go through `pathlib.Path(name).resolve().relative_to(project_root)`; reject `..` or absolute prefix. | `tests/contract/test_codex_path_containment.py` |
 | 2-5 | Inherit step1+step2 rules (secret redaction, log integrity, frontmatter escaping, recap PII cap). | step1.md / step2.md test files |
-| 6 | **Cross-target name consistency.** `codex-side/src/.codex-plugin/plugin.json::name` MUST equal `claude-side/.claude-plugin/plugin.json::name` byte-equal (also enforced in step5 via `.mcp.json` mirror). No `name` divergence between Claude and Codex manifests. | `tests/contract/test_dual_target_name.py` |
 
-**Why this matters.** Security finding 1 in PR #4 named `step4.md:19` as well. Mirror of step3 rule 1 — same resolve+relative-to check on the Codex side. Rule 6 keeps `name` consistent so both sides stay discoverable as the same plugin in their marketplaces.
+**Why this matters.** Security finding 1 in PR #4 named `step4.md:19` as well. Mirror of step3 rule 1 — same resolve+relative-to check on the Codex side.
+
+> **Step 4 ordering precondition (added iter-3).** step4 is gated on step3 manifest emitting first; cannot run concurrently with step3 (otherwise step4's path-containment rule sees a half-state). This is encoded in `depends_on: [step2]` AND a runtime assertion that `claude-side/.claude-plugin/plugin.json` exists with valid JSON before step4 begins. See `tests/contract/test_step4_precondition.py`.
+>
+> **Cross-target name check moved to step5** (per `/dev-kit:review` iter-2 finding #6: step4 alone cannot enforce name byte-equality because step3 may not have completed its emit yet). step5 rule 4 now owns that check.
