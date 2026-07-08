@@ -12,8 +12,10 @@ Given `interview.json`, emit a valid Codex plugin source tree at `src/`. Must in
 ## Outputs
 - `src/.codex-plugin/plugin.json` (with name, version, entry points)
 - `src/skills/<name>/SKILL.md` (Codex format)
-- `src/README.md` (plugin usage)
+- `src/README.md` (merged usage doc — sole writer, emitted AFTER step 4 completes)
 - Unit tests: `plugin.json` schema, SKILL.md format
+
+**Note**: Step 5 runs AFTER step 4 (depends on step 4's CC files existing on disk). Step 5 is the SOLE emitter of `src/README.md`. Step 4 must NOT emit `src/README.md`. This eliminates the merge-order ambiguity flagged in review.
 
 ## Acceptance criteria
 - Generated `.codex-plugin/plugin.json` is valid per Codex spec

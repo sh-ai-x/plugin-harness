@@ -11,8 +11,9 @@ Given `interview.json`, emit a valid Claude Code plugin source tree at `src/`. M
 ## Outputs
 - `src/.claude/skills/<name>/SKILL.md` (with frontmatter + body)
 - `src/.mcp.json` (if MCP needed for the plugin)
-- `src/README.md` (plugin usage)
 - Unit tests: frontmatter validity, body structure, file presence
+
+**Note**: Step 4 emits CC-specific files ONLY. The merged `src/README.md` is emitted by step 5 after step 4 completes — step 5 is the sole writer, no merge conflict.
 
 ## Acceptance criteria
 - Generated `.claude/skills/<name>/SKILL.md` is valid per Claude Code spec
