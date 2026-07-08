@@ -20,8 +20,8 @@ Before the smoke test (step 7), verify that the logs, the plugin source, and the
   - `primary_entry_point` is an explicit field in `interview.json` (added in step 1's schema: `{"primary_entry_point": "/<skill-name>"}`). Both emitters (step 4 → `.mcp.json`, step 5 → `plugin.json`) MUST write this exact string. Step 6 compares the two values byte-equal.
   - **DOWNGRADED-BUT-ACTIVE** (always runs, never silently skipped):
   - If both `plugin.json` and `.mcp.json` are present → they MUST agree on `primary_entry_point` (HARD FAIL on mismatch)
-  - If only `plugin.json` is present (Codex-only transport) → log WARNING with "Codex-only transport" allow-state marker, do NOT hard-fail
-  - If only `.mcp.json` is present (Claude-Code-only transport) → log WARNING with "Claude-Code-only transport" allow-state marker, do NOT hard-fail
+  - If only `plugin.json` is present (Codex-only transport — step 5 always emits `plugin.json`) → log WARNING with "Codex-only transport" allow-state marker, do NOT hard-fail
+  - (Removed unreachable branch) "Claude-Code-only transport" case: `plugin.json` is always emitted by step 5, so `.mcp.json` without `plugin.json` cannot occur in the current pipeline. If a future change makes step 5 skippable (e.g., `--no-codex` flag), re-introduce this branch
   - If NEITHER is present → HARD FAIL with "no transport config emitted" — an emitter that failed silently must not pass the BLOCKING gate
 - If any HARD-FAIL check fails, exit code 1 + clear error
 - **Remediation map**: every HARD-FAIL check declares which upstream step to re-run, and the error message names the failing check + the upstream step:

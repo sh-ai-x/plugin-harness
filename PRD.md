@@ -55,7 +55,7 @@
 
 ```
 Q1 [PASS]: failure mode — no plugin-creation tool exists, every author re-rolls the same boilerplate
-Q2 [PASS]: first user — you; smallest action `/dev-kit:plan-plugin <idea-or-company>` → 5-question plan + dual-runtime plugin
+Q2 [PASS]: first user — you; smallest action `/plugin-harness:plan <idea-or-company>` → 5-question plan + dual-runtime plugin
 Q3 [PASS (sharpen×1)]: kill-shot — interview + AI research + plugin generation, ≤2 person-days, test on 1 real idea
 Q4 [PASS]: prior try — wrote CC skill, ported to Codex; learned dual plugin.json is hand-ported and error-prone
 Q5 [PASS]: next build — plugin dry-run tester (runs plugin in both runtimes, diffs behavior)
@@ -79,7 +79,7 @@ See `phases/plugin-harness/index.json` for the canonical phase manifest. Step fi
 
 ## 7. Acceptance criteria
 
-1. `/dev-kit:plan-plugin --mode <A|B> <idea-or-company>` runs the 5-question interview (mode A) OR web-research + auto-fill (mode B)
+1. `/plugin-harness:plan --mode <A|B> <idea-or-company>` runs the 5-question interview (mode A) OR web-research + auto-fill (mode B)
 2. Output installs cleanly in Claude Code AND Codex as a plugin (no dev-kit runtime dep)
 3. Verbatim AI conversation log captured to `logs/` (md/txt/json/jsonl) by the producer step (step 2 mode A, step 3 mode B)
 4. Generated plugin source tree matches Codex spec format (`.codex-plugin/plugin.json` + `skills/<name>/SKILL.md`)

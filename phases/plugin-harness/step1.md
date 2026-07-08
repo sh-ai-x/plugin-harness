@@ -10,14 +10,19 @@ Define the 5 questions as a stable contract. Output `questions.json` (or equival
 - Q1 grill-me answer: failure mode = no plugin tool exists, every author re-rolls the same boilerplate
 
 ## Outputs
-- `questions.json` schema with 5 questions
+- `questions.json` schema with 5 questions, plus a top-level `interview_metadata` block (owned by step 1):
+  - `primary_entry_point` (string, e.g., `/<skill-name>`) — the single field both step 4 and step 5 write to their respective runtime configs; step 6 compares byte-equal
+  - `skill_name` (string, kebab-case)
+  - `idea_or_company` (string)
+- `/plugin-harness:plan --mode <A|B> --name <skill-name> <idea-or-company>` CLI command (owned by step 1; delegates to step 2 or step 3 based on `--mode`)
 - Unit tests for schema validation
-- README snippet documenting the 5 questions
+- README snippet documenting the 5 questions + interview_metadata
 
 ## Acceptance criteria
 - 5 questions defined, matching the Codex submission format
 - Each question has: `id`, `prompt`, `response_shape`, `evidence_mode`
 - Schema is versioned and stable across modes A and B
+- `interview_metadata` block is the SOLE owner of `primary_entry_point`, `skill_name`, `idea_or_company` — step 4 and step 5 read these fields; they do NOT introduce their own copy
 - Unit tests cover all 5 questions + edge cases (empty response, multi-line response)
 
 ## TDD order (red → green → refactor)

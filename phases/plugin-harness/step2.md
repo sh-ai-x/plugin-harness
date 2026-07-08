@@ -8,7 +8,7 @@ CLI that runs the 5-question interview; user fills answers directly. Persists an
 - `interview.json` schema (defined in this step)
 
 ## Outputs
-- `/dev-kit:plan-plugin --mode A <idea-or-company>` command
+- `/plugin-harness:plan --mode A <idea-or-company>` command
 - `interview.json` with user-filled answers
 - `logs/<session-id>.md` (verbatim AI conversation — every user prompt + every assistant response)
 - Unit tests: prompt order, required fields, persistence, resume, log capture
@@ -23,6 +23,13 @@ CLI that runs the 5-question interview; user fills answers directly. Persists an
   1. **Known secret patterns (with separator)**: `(?i)(api[_-]?key|token|secret|password)\s*[:=]\s*\S+`
   2. **AWS access keys (all 8 documented prefixes)**: `\b(AKIA|ASIA|AROA|AIDA|ANPA|ANVA|AGPA|APKA)[0-9A-Z]{16}\b` — `AKIA` is the classic, `ASIA` is STS temp credentials, `AROA`/`AIDA`/`ANPA`/`ANVA` are role/user/policy/notary, `AGPA` is groups, `APKA` is marketplace
   3. **GitHub tokens (all 6 families)**: `\b(ghp_|gho_|ghu_|ghs_|ghr_|github_pat_)[A-Za-z0-9_]{30,}\b` — `ghp_` classic PAT, `gho_` OAuth, `ghu_` user-to-server, `ghs_` server-to-server, `ghr_` refresh, `github_pat_` fine-grained
+  3a. **Stripe keys**: `\b(sk_live_|sk_test_|rk_live_)[A-Za-z0-9]{24,}\b` — live, test, restricted
+  3b. **Anthropic keys**: `\bsk-ant-api03-[A-Za-z0-9_\-]{32,}\b`
+  3c. **Slack tokens**: `\bxox[bpoas]\-[A-Za-z0-9\-]{10,}\b` — bot, user, app, etc.
+  3d. **Google API keys**: `\bAIza[A-Za-z0-9_\-]{35}\b`
+  3e. **npm tokens**: `\bnpm_[A-Za-z0-9]{36}\b`
+  3f. **Twilio keys**: `\b(SK|AC)[A-Za-z0-9]{32}\b` — SID or auth token
+  3g. **SendGrid keys**: `\bSG\.[A-Za-z0-9_\-]{22}\.[A-Za-z0-9_\-]{43}\b`
   4. **JWT tokens**: `\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b`
   5. **PEM blocks**: `-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----[\s\S]*?-----END (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----`
   6. **Bearer tokens**: `(?i)bearer\s+[A-Za-z0-9._\-+/=]{20,}`

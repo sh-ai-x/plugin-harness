@@ -13,6 +13,8 @@ Given `interview.json`, emit a valid Claude Code plugin source tree at `src/`. M
 - `src/.mcp.json` (if MCP needed for the plugin)
 - Unit tests: frontmatter validity, body structure, file presence
 
+> **MUST NOT emit**: `src/README.md`. The writer-exclusion mutex is owned by step 5 (step 5 is the sole writer of `src/README.md`; step 4 must NOT emit it). A RED test in step 4's TDD asserts the absence.
+
 **Note on ordering**: Step 4 and step 5 are independent emitters (no data dependency — both read only `interview.json`). The only cross-step constraint is the writer-exclusion mutex on `src/README.md` (see step 5), which is about WHO writes the file, not about ORDER. There is no step-4-must-precede-step-5 dependency.
 
 ## Acceptance criteria
@@ -24,9 +26,10 @@ Given `interview.json`, emit a valid Claude Code plugin source tree at `src/`. M
 ## TDD order
 1. RED: test that emitted SKILL.md has valid frontmatter
 2. RED: test that SKILL.md body includes 5-question answers
-3. RED: test that `.mcp.json` is valid JSON
-4. GREEN: implement emitter
-5. REFACTOR: template engine
+3. RED: test that `.mcp.json` is valid JSON AND includes `primary_entry_point` from the shared `Metadata` (imported from the module shared with step 5)
+4. RED: test that step 4 does NOT emit `src/README.md` (writer-exclusion mutex)
+5. GREEN: implement emitter (imports `Metadata` from shared module; formats for Claude Code shape)
+6. REFACTOR: template engine
 
 ## Risks
 - Claude Code spec may change — pin version
