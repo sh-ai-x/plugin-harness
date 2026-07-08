@@ -233,13 +233,21 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
-          RUN_STARTED_AT: ${{ github.run_started_at }}
         run: |
           set -uo pipefail
-          # First 'Verdict: <value>' line in the most recent claude[bot] comment.
-          # track_progress is disabled elsewhere in this workflow; each LLM run
-          # posts a NEW comment, so the API comment list grows monotonically.
-          # We sort by created_at desc + take head -1 so most-recent wins.
+          RUN_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          # First 'Verdict: <value>' line in the most recent claude[bot] comment
+          # posted DURING THIS workflow run (since=$RUN_STARTED_AT).
+          #
+          # Notes:
+          #   - track_progress disabled elsewhere; each LLM run posts a NEW
+          #     comment. We sort desc + head -1 so most-recent wins.
+          #   - Skip-protection: when this PR changes .github/workflows/, the
+          #     Claude Code Action does not run, posts nothing, and the filter
+          #     excludes any pre-existing Verdict comment. The empty result
+          #     triggers the file-header empty-verdict -> Approve fallback.
+          #   - RUN_STARTED_AT captured at THIS step (run_started_at context
+          #     is undefined on some events / runners).
           # (Earlier versions took head -1 of the asc-sorted default, which
           # got the OLDEST comment; that misbehaved once a previous run left
           # a non-Approve verdict on the PR.)
@@ -408,13 +416,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
-          RUN_STARTED_AT: ${{ github.run_started_at }}
         run: |
           set -uo pipefail
+          RUN_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           # Same contract as the review-extractor: most-recent claude[bot]
-          # comment posted during this workflow run (since=$RUN_STARTED_AT).
+          # comment posted DURING THIS workflow run (since=$RUN_STARTED_AT).
           # Skip-protected runs (e.g. when review.yml itself changes on the PR)
-          # see no comment, fall back to the empty-verdict → Approve path
+          # see no comment, fall back to the empty-verdict -> Approve path
           # declared in the file header.
           verdict="$(gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments?since=${RUN_STARTED_AT}&per_page=100" \
             --jq 'sort_by(.created_at) | reverse | .[] | select((.user.login // "") | startswith("claude")) | .body' \
