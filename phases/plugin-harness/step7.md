@@ -1,53 +1,35 @@
-# Step 7 — implement submission.zip assembly
+# Step 7 — end-to-end smoke test (kill-shot)
 
 ## Goal
-Bundle the generated plugin source + README + scrubbed logs into `submission.zip` matching the Codex submission spec. Runs ONLY after step 6 (consistency check) passes.
+Validate the full pipeline end-to-end on 1 real idea, within the ≤2 person-day bound from Q3. Runs ONLY after step 6 (consistency check) passes.
 
 ## Inputs
-- `src/` (Claude Code + Codex plugin source from steps 4 + 5)
-- `README.md` (root-level — produced by step 5; copied to zip root)
-- `logs/` (verbatim AI conversation from step 2 or 3 — SCRUBBED before inclusion)
+- 1 real idea (e.g., "GitHub PR triage" or "Notion daily digest")
+- All previous steps implemented
 
 ## Outputs
-- `submission.zip` with the structure:
-  ```
-  submission.zip
-  ├── src/
-  │   ├── .codex-plugin/plugin.json
-  │   ├── skills/<name>/SKILL.md
-  │   ├── .claude/skills/<name>/SKILL.md
-  │   ├── .mcp.json
-  │   └── ...
-  ├── README.md
-  └── logs/
-      └── <conversation>.md
-  ```
-- Unit tests: zip structure, file presence, no extra files at root, scrubber runs
+- Test report: pass/fail per step + install verification in both runtimes
+- Time/effort log (must be ≤2 person-days)
 
 ## Acceptance criteria
-- Zip structure exactly matches Codex submission spec
-- `src/.codex-plugin/plugin.json` is at `src/.codex-plugin/plugin.json` (not nested deeper)
-- `logs/` contains **SCRUBBED** AI conversation — scrubbing is a hard requirement (was previously in Risks; promoted to AC per review)
-- **Log scrubbing rules** (applied before zip):
-  - Strip lines matching `(?i)(api[_-]?key|token|secret|password)\s*[:=]\s*\S+`
-  - Replace email addresses (RFC 5322 pattern) with `<email-redacted>`
-  - Replace strings matching `sk-[A-Za-z0-9]{20,}` with `<token-redacted>`
-  - Replace IPv4 dotted-quad addresses with `<ip-redacted>`
-  - Scrubber unit test: known-bad log sample → all secrets redacted
-- Zip contents are stable in size and order, but NOT byte-equal across runs (mode B retrieval timestamps make byte-stable reproducibility infeasible; document this explicitly)
+- Full pipeline runs in ≤2 person-days (1 day, 1 person)
+- Generated plugin installs cleanly in Claude Code AND Codex
+- 5-question answers are coherent + non-hallucinated (manual review by user)
+- No silent runtime breaks (verify by invoking the plugin in both runtimes)
 
-## TDD order
-1. RED: test zip has `src/`, `README.md`, `logs/` at root
-2. RED: test that `src/.codex-plugin/plugin.json` is at the right path
-3. RED: test log scrubbing — API key line redacted
-4. RED: test log scrubbing — email redacted
-5. RED: test log scrubbing — `sk-...` token redacted
-6. RED: test log scrubbing — IP redacted
-7. RED: test log scrubbing — known-bad log sample → all secrets redacted
-8. GREEN: implement zip builder + scrubber
-9. REFACTOR: normalize file ordering, extract scrubber
+## TDD order (scenario-style)
+1. Pick 1 real idea (e.g., "GitHub PR triage")
+2. Run mode A: `/dev-kit:plan-plugin "GitHub PR triage" --mode A`
+3. Verify all 5 answers are filled
+4. Run mode B on the same idea
+5. Compare mode A vs mode B outputs
+6. Generate plugin (steps 4 + 5)
+7. Run consistency check (step 6) — must pass before continuing
+8. Install in Claude Code, invoke once, verify behavior
+9. Install in Codex, invoke once, verify behavior
+10. Compare runtime behavior (this is the "kill shot" for the next-build Q5 idea — plugin dry-run tester)
 
 ## Risks
-- Scrubber may over-redact (false positives) — tune regex iteratively
-- Scrubber may under-redact (miss novel secret formats) — extend pattern library over time
-- Zip format edge cases (UTF-8 names, large files) — use Python's `zipfile` with proper flags
+- Real idea may have edge cases — keep it simple for first run
+- Install issues in one runtime may block — have rollback plan
+- Time bound is tight — track time per step

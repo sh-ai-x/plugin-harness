@@ -1,7 +1,7 @@
 # Step 6 — implement log↔plugin↔questionnaire consistency check
 
 ## Goal
-Before zip assembly (step 7), verify that the logs, the plugin source, and the interview answers all agree. Catch drift before submission rejection. BLOCKING gate — step 7 only runs if this step passes.
+Before the smoke test (step 7), verify that the logs, the plugin source, and the interview answers all agree. Catch drift before downstream consumption. BLOCKING gate — step 7 only runs if this step passes.
 
 ## Inputs
 - `interview.json` (5 answers from step 2 or 3)
