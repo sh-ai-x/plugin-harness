@@ -79,7 +79,7 @@ See `phases/plugin-harness/index.json` for the canonical phase manifest. Step fi
 
 ## 7. Acceptance criteria
 
-1. `/plugin-harness:plan --mode <A|B> <idea-or-company>` runs the 5-question interview (mode A) OR web-research + auto-fill (mode B)
+1. `/plugin-harness:plan --mode <A|B> --name <skill-name> <idea-or-company>` runs the 5-question interview (mode A) OR web-research + auto-fill (mode B)
 2. Output installs cleanly in Claude Code AND Codex as a plugin (no dev-kit runtime dep)
 3. Verbatim AI conversation log captured to `logs/` (md/txt/json/jsonl) by the producer step (step 2 mode A, step 3 mode B)
 4. Generated plugin source tree matches Codex spec format (`.codex-plugin/plugin.json` + `skills/<name>/SKILL.md`)
