@@ -8,17 +8,17 @@
 
 **Customer**: Plugin authors who need to ship dual-runtime plugins. First user = repo owner (you). Second user archetype = first-time Codex plugin contestant. Third user archetype = hackathon team that needs a working plugin by demo.
 
-**Situation**: Author has an idea (or a company to target), wants to ship a plugin to both Claude Code and Codex, but must hand-roll the 5-question interview, dual plugin.json layouts, verbatim logs, and `submission.zip` assembly — with no tool to enforce consistency.
+**Situation**: Author has an idea (or a company to target), wants to ship a plugin to both Claude Code and Codex, but must hand-roll the 5-question interview, dual plugin.json layouts, and verbatim logs — with no tool to enforce cross-runtime consistency.
 
-**Cause**: Existing tools (cookiecutter-style generators) produce code but not the 5 questions or logs. Manual porting between runtimes is error-prone. Log↔plugin↔questionnaire drift is the #1 cause of submission rejections.
+**Cause**: Existing tools (cookiecutter-style generators) produce code but not the 5 questions or logs. Manual porting between runtimes is error-prone. Log↔plugin↔questionnaire drift is the #1 cause of build-time inconsistency.
 
-**Cost**: Hours of manual work per plugin; silent runtime breaks from field-name diffs; submission rejections on consistency check; abandonment of plugin ideas that "are too much boilerplate to ship."
+**Cost**: Hours of manual work per plugin; silent runtime breaks from field-name diffs; smoke-test failures from drift; abandonment of plugin ideas that "are too much boilerplate to ship."
 
 ## 2. Evidence
 
 | # | Source | URL | Independent | Use |
 |---|---|---|---|---|
-| 1 | Codex plugin overview | https://developers.openai.com/codex/plugins | yes (official) | 5-question format + submission.zip layout |
+| 1 | Codex plugin overview | https://developers.openai.com/codex/plugins | yes (official) | 5-question format + plugin.json layout |
 | 2 | Codex plugin build | https://developers.openai.com/codex/plugins/build | yes (official) | plugin.json + MCP integration |
 | 3 | Codex skills spec | https://developers.openai.com/codex/skills | yes (official) | SKILL.md structure |
 | 4 | User's prior CC→Codex port (Q4 grill-me) | first-hand | first-person | validates dual-runtime pain |
@@ -29,14 +29,14 @@
 
 **Alternatives considered**:
 
-1. **Manual approach** — author hand-writes 5-question responses, plugin code, `logs/`, `submission.zip`. No tooling.
+1. **Manual approach** — author hand-writes 5-question responses, plugin code, `logs/`. No tooling.
 2. **Existing plugin generators** (cookiecutter, npm init, Yeoman) — produce code scaffolding but not the 5-question interview or logs.
 3. **plugin-harness** (this project) — 2 modes, dual-runtime, log↔plugin↔questionnaire consistency check.
 
 **Differentiation (customer language)**:
 - "I can either fill in 5 questions or just give an idea — the tool researches the rest."
 - "I get a plugin that works in Claude Code AND Codex, not just one."
-- "My logs and plugin can't drift — the consistency check catches it before submission."
+- "My logs and plugin can't drift — the consistency check catches it before the smoke test."
 
 **Unit margin**: positive. Each plugin shipped saves hours of manual work + reduces rejection rate. Tool itself is a one-time build, reusable across many plugins.
 
@@ -55,7 +55,7 @@
 
 ```
 Q1 [PASS]: failure mode — no plugin-creation tool exists, every author re-rolls the same boilerplate
-Q2 [PASS]: first user — you; smallest action `/dev-kit:plan-plugin <idea-or-company>` → 5-question plan + dual-runtime plugin + submission.zip
+Q2 [PASS]: first user — you; smallest action `/dev-kit:plan-plugin <idea-or-company>` → 5-question plan + dual-runtime plugin
 Q3 [PASS (sharpen×1)]: kill-shot — interview + AI research + plugin generation, ≤2 person-days, test on 1 real idea
 Q4 [PASS]: prior try — wrote CC skill, ported to Codex; learned dual plugin.json is hand-ported and error-prone
 Q5 [PASS]: next build — plugin dry-run tester (runs plugin in both runtimes, diffs behavior)
