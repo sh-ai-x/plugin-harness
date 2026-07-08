@@ -16,16 +16,19 @@ Before the smoke test (step 7), verify that the logs, the plugin source, and the
 - Each interview answer appears in the generated SKILL.md body
 - Each SKILL.md feature traces back to an interview answer
 - The logs reference all 5 questions (the conversation actually covered them)
-- The Codex `plugin.json` and Claude Code `.mcp.json` agreement check — **DOWNGRADED-BUT-ACTIVE** (always runs, never silently skipped):
-  - If both `plugin.json` and `.mcp.json` are present → they MUST agree on the plugin's primary entry point (HARD FAIL on mismatch)
+- The Codex `plugin.json` and Claude Code `.mcp.json` agreement check — **PINNED contract**:
+  - `primary_entry_point` is an explicit field in `interview.json` (added in step 1's schema: `{"primary_entry_point": "/<skill-name>"}`). Both emitters (step 4 → `.mcp.json`, step 5 → `plugin.json`) MUST write this exact string. Step 6 compares the two values byte-equal.
+  - **DOWNGRADED-BUT-ACTIVE** (always runs, never silently skipped):
+  - If both `plugin.json` and `.mcp.json` are present → they MUST agree on `primary_entry_point` (HARD FAIL on mismatch)
   - If only `plugin.json` is present (Codex-only transport) → log WARNING with "Codex-only transport" allow-state marker, do NOT hard-fail
   - If only `.mcp.json` is present (Claude-Code-only transport) → log WARNING with "Claude-Code-only transport" allow-state marker, do NOT hard-fail
+  - If NEITHER is present → HARD FAIL with "no transport config emitted" — an emitter that failed silently must not pass the BLOCKING gate
 - If any HARD-FAIL check fails, exit code 1 + clear error
 - **Remediation map**: every HARD-FAIL check declares which upstream step to re-run, and the error message names the failing check + the upstream step:
   - `interview.json` shape mismatch (5 questions missing or malformed) → re-run step 2 (mode A) or step 3 (mode B)
   - Generated plugin doesn't reference any of the 5 answers → re-run step 4 and step 5 with the same `interview.json`
   - Logs don't mention all 5 questions → re-run step 2 or step 3 (whichever produced `logs/`)
-  - Cross-runtime metadata mismatch between `plugin.json` and `.mcp.json` (both-present case) → fix the inconsistent field in both emitters (step 4 and step 5)
+  - Cross-runtime metadata mismatch between `plugin.json` and `.mcp.json` (both-present case, or neither-present case) → fix the inconsistent field in both emitters (step 4 and step 5) or fix the upstream step that failed to emit
   - The smoke test in step 7 is BLOCKED until every check passes
 
 ## TDD order

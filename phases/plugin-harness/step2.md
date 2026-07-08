@@ -21,8 +21,8 @@ CLI that runs the 5-question interview; user fills answers directly. Persists an
 - Verbatim AI conversation captured to `logs/<session-id>.md` (md format, no edits/excerpts)
 - **Log redaction policy** (LAYERED scrubber — single-pattern regex is bypassable per the LLM review; applied to BOTH user prompts and assistant responses before write):
   1. **Known secret patterns (with separator)**: `(?i)(api[_-]?key|token|secret|password)\s*[:=]\s*\S+`
-  2. **AWS access keys**: `\bAKIA[0-9A-Z]{16}\b`
-  3. **GitHub PATs**: `\bghp_[A-Za-z0-9]{30,}\b`
+  2. **AWS access keys (all 8 documented prefixes)**: `\b(AKIA|ASIA|AROA|AIDA|ANPA|ANVA|AGPA|APKA)[0-9A-Z]{16}\b` — `AKIA` is the classic, `ASIA` is STS temp credentials, `AROA`/`AIDA`/`ANPA`/`ANVA` are role/user/policy/notary, `AGPA` is groups, `APKA` is marketplace
+  3. **GitHub tokens (all 6 families)**: `\b(ghp_|gho_|ghu_|ghs_|ghr_|github_pat_)[A-Za-z0-9_]{30,}\b` — `ghp_` classic PAT, `gho_` OAuth, `ghu_` user-to-server, `ghs_` server-to-server, `ghr_` refresh, `github_pat_` fine-grained
   4. **JWT tokens**: `\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b`
   5. **PEM blocks**: `-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----[\s\S]*?-----END (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----`
   6. **Bearer tokens**: `(?i)bearer\s+[A-Za-z0-9._\-+/=]{20,}`

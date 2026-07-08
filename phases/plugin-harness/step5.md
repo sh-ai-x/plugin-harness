@@ -12,11 +12,12 @@ Given `interview.json`, emit a valid Codex plugin source tree at `src/`. Must in
 **Note on leaky contracts**: step 5 reads ONLY `interview.json`, not step 4's on-disk emitter output. Cross-runtime metadata (plugin name, version, skill name) is derived from `interview.json` alone, not by parsing step 4's emitted files. This keeps the data contract explicit and avoids the implicit "step 5 must wait for step 4 and parse its output shape" coupling. Step 6's consistency check then compares step 4 vs step 5 outputs at the file level, not by implicit shared state.
 
 ## Outputs
-- `src/.codex-plugin/plugin.json` (with name, version, entry points)
+- `src/.codex-plugin/plugin.json` (with name, version, entry points, primary_entry_point)
 - `src/skills/<name>/SKILL.md` (Codex format)
-- `src/README.md` (merged usage doc — sole writer, emitted AFTER step 4 completes)
-- `README.md` at repo root (copy of `src/README.md` — for local repo discoverability, not for any submission artifact)
-- Unit tests: `plugin.json` schema, SKILL.md format, root README equals `src/README.md`
+- `src/README.md` (merged usage doc — sole writer; the writer-exclusion mutex below is the only real constraint against step 4)
+- Unit tests: `plugin.json` schema (including `primary_entry_point` field), SKILL.md format
+
+> **Removed** (per LLM review): `README.md` at repo root. Emitting it would clobber plugin-harness's own `README.md` on first run. If a local-repo copy is desired, the build stage will provide a separate opt-in post-build step (not in this plan).
 
 **Note on ordering**: the only real constraint between step 4 and step 5 is the **writer-exclusion mutex** on `src/README.md` — step 4 must NOT emit it, step 5 is the sole writer. Step 5 does NOT depend on step 4's on-disk output (it reads only `interview.json`, see Inputs above). The two emitters can run in any order as long as the mutex holds.
 
