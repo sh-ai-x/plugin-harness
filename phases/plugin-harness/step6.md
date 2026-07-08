@@ -21,6 +21,12 @@ Before the smoke test (step 7), verify that the logs, the plugin source, and the
   - If only `plugin.json` is present (Codex-only transport) → log WARNING with "Codex-only transport" allow-state marker, do NOT hard-fail
   - If only `.mcp.json` is present (Claude-Code-only transport) → log WARNING with "Claude-Code-only transport" allow-state marker, do NOT hard-fail
 - If any HARD-FAIL check fails, exit code 1 + clear error
+- **Remediation map**: every HARD-FAIL check declares which upstream step to re-run, and the error message names the failing check + the upstream step:
+  - `interview.json` shape mismatch (5 questions missing or malformed) → re-run step 2 (mode A) or step 3 (mode B)
+  - Generated plugin doesn't reference any of the 5 answers → re-run step 4 and step 5 with the same `interview.json`
+  - Logs don't mention all 5 questions → re-run step 2 or step 3 (whichever produced `logs/`)
+  - Cross-runtime metadata mismatch between `plugin.json` and `.mcp.json` (both-present case) → fix the inconsistent field in both emitters (step 4 and step 5)
+  - The smoke test in step 7 is BLOCKED until every check passes
 
 ## TDD order
 1. RED: test that all 5 answers are referenced in the generated plugin

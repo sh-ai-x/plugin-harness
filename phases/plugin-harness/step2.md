@@ -19,6 +19,7 @@ CLI that runs the 5-question interview; user fills answers directly. Persists an
 - All answers validate against the `questions.json` schema
 - Output `interview.json` is JSON-serializable + human-readable
 - Verbatim AI conversation captured to `logs/<session-id>.md` (md format, no edits/excerpts)
+- **Log redaction policy** (applied to BOTH user prompts and assistant responses before write): strip lines matching `(?i)(api[_-]?key|token|secret|password)\s*[:=]\s*\S+`, replace email addresses (RFC 5322 pattern) with `<email-redacted>`, replace strings matching `sk-[A-Za-z0-9]{20,}` with `<token-redacted>`, replace IPv4 dotted-quad addresses with `<ip-redacted>`. Redaction unit test: known-bad log sample → all secrets redacted. Shared with step 3 (mode B's web-retrieval output goes through the same scrubber before logging).
 
 ## TDD order
 1. RED: test that CLI asks all 5 questions in order

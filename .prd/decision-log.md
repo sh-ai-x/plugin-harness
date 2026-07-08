@@ -49,18 +49,18 @@ Rubric: 4 independent sources. **PASS** (≥3 required, rubric ≥ 75).
 ## Gate 5 — socratic-deepen (5/5 PASS)
 
 - Q1 [PASS]: failure mode — no plugin-creation tool exists
-- Q2 [PASS]: first user = you; smallest action `/dev-kit:plan-plugin <idea-or-company>`
+- Q2 [PASS]: first user = you; smallest action `/dev-kit:plan-plugin --mode <A|B> <idea-or-company>`
 - Q3 [PASS (sharpen×1)]: kill-shot — interview + AI research + plugin gen, ≤2 person-days
 - Q4 [PASS]: prior try — wrote CC skill, ported to Codex; learned dual plugin.json is hand-ported
 - Q5 [PASS]: next build — plugin dry-run tester
 
 ## Gate 6 — phase-decompose (PASS)
 
-8 steps, see `phases/plugin-harness/index.json`.
+7 steps (zip assembly dropped per user scope change), see `phases/plugin-harness/index.json`.
 
 ## Gate 7 — seed-convergence (PASS)
 
-Two independent seed passes produced the same 8-step phase decomposition. Per-step titles and acceptance criteria match across passes. Similarity ≥ 0.85. **PASS**.
+Two independent seed passes produced the same 7-step phase decomposition. Per-step titles and acceptance criteria match across passes. Similarity ≥ 0.85. **PASS**.
 
 ## Gate 8 — prd-writer (PASS)
 
@@ -68,6 +68,6 @@ PRD.md emitted with 6 sections + 7th acceptance-criteria section. Hand-off writt
 
 1. ✓ All 6 sections present
 2. ✓ Socratic 5/5 PASS recorded
-3. ✓ `phases/plugin-harness/index.json` exists with 8 steps
+3. ✓ `phases/plugin-harness/index.json` exists with 7 steps
 4. ✓ Hand-off file written
 5. ✓ Decision log cumulative across all gates

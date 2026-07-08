@@ -4,11 +4,12 @@
 Given `interview.json`, emit a valid Codex plugin source tree at `src/`. Must include `.codex-plugin/plugin.json` and `skills/<name>/SKILL.md`.
 
 ## Inputs
-- `interview.json` from step 2 or 3
-- **Step 4 outputs (data contract)**: `src/.claude/skills/<name>/SKILL.md` and `src/.mcp.json` (if emitted) — step 5 reads these to derive cross-runtime metadata
+- `interview.json` from step 2 or 3 (sole source for codex metadata)
 - Codex plugin spec: https://developers.openai.com/codex/plugins
 - Codex skills spec: https://developers.openai.com/codex/skills
 - Skill name (from `--name` flag)
+
+**Note on leaky contracts**: step 5 reads ONLY `interview.json`, not step 4's on-disk emitter output. Cross-runtime metadata (plugin name, version, skill name) is derived from `interview.json` alone, not by parsing step 4's emitted files. This keeps the data contract explicit and avoids the implicit "step 5 must wait for step 4 and parse its output shape" coupling. Step 6's consistency check then compares step 4 vs step 5 outputs at the file level, not by implicit shared state.
 
 ## Outputs
 - `src/.codex-plugin/plugin.json` (with name, version, entry points)

@@ -21,6 +21,8 @@ Given an idea or company (from CLI), AI searches the web for evidence and fills 
 - If web search fails for a question, fall back to LLM-only with explicit "no evidence" marker
 - Output is interchangeable with mode A output (downstream steps don't care which mode produced it)
 - Verbatim AI conversation captured to `logs/<session-id>.md` (md format, no edits/excerpts)
+- **Prompt-injection guard**: retrieved web content containing instruction-like patterns (`(?i)(ignore (all|previous) instructions|system:|<\|im_start\|>|you are now)`) is REJECTED and logged as `injection_attempt`; the question falls back to LLM-only with explicit "no evidence" marker
+- **URL allowlist**: only these domains are accepted as evidence URLs (everything else is rejected as untrusted): `*.github.com`, `*.wikipedia.org`, `*.arxiv.org`, `*.openai.com`, `*.anthropic.com`, `*.mozilla.org`, `*.w3.org`. New domains added only via config-file change (not inline).
 
 ## TDD order
 1. RED: test that mode B produces `interview.json` with 5 answers

@@ -10,8 +10,8 @@
 
 - `PRD.md` — 6 sections + acceptance criteria
 - `.prd/decision-log.md` — cumulative decisions across all 8 gates
-- `phases/plugin-harness/index.json` — 8 steps
-- `phases/plugin-harness/step{1..8}.md` — per-step specs
+- `phases/plugin-harness/index.json` — 7 steps (zip assembly step dropped per user scope change)
+- `phases/plugin-harness/step{1..7}.md` — per-step specs
 
 ## Stage transition
 - `plan` → `build`
@@ -26,9 +26,9 @@ Run `/dev-kit:build` to convert `phases/plugin-harness/step<N>.md` into per-step
 - Two modes: user-driven (A) and AI-research-driven (B)
 - 5 questions from Codex submission format
 - Dual runtime: Claude Code + Codex
-- `submission.zip` matches Codex spec
-- Consistency check before zip (log↔plugin↔questionnaire)
+- Consistency check (step 6) is a BLOCKING gate before the smoke test (step 7)
+- (Removed: submission.zip packaging — deferred per user scope change in iteration 3)
 
 ## Open risks (from Q4)
 - Dual plugin.json layout hand-ported, error-prone — addressed by sharing template in steps 4+5
-- Silent runtime breaks from field-name diffs — caught by step 7 consistency check
+- Silent runtime breaks from field-name diffs — caught by step 6 consistency check (BLOCKING)
