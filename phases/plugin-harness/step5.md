@@ -5,6 +5,7 @@ Given `interview.json`, emit a valid Codex plugin source tree at `src/`. Must in
 
 ## Inputs
 - `interview.json` from step 2 or 3
+- **Step 4 outputs (data contract)**: `src/.claude/skills/<name>/SKILL.md` and `src/.mcp.json` (if emitted) — step 5 reads these to derive cross-runtime metadata
 - Codex plugin spec: https://developers.openai.com/codex/plugins
 - Codex skills spec: https://developers.openai.com/codex/skills
 - Skill name (from `--name` flag)
@@ -13,7 +14,8 @@ Given `interview.json`, emit a valid Codex plugin source tree at `src/`. Must in
 - `src/.codex-plugin/plugin.json` (with name, version, entry points)
 - `src/skills/<name>/SKILL.md` (Codex format)
 - `src/README.md` (merged usage doc — sole writer, emitted AFTER step 4 completes)
-- Unit tests: `plugin.json` schema, SKILL.md format
+- `README.md` at repo root (copy of `src/README.md` — required by zip structure in step 7)
+- Unit tests: `plugin.json` schema, SKILL.md format, root README equals `src/README.md`
 
 **Note**: Step 5 runs AFTER step 4 (depends on step 4's CC files existing on disk). Step 5 is the SOLE emitter of `src/README.md`. Step 4 must NOT emit `src/README.md`. This eliminates the merge-order ambiguity flagged in review.
 
@@ -21,7 +23,8 @@ Given `interview.json`, emit a valid Codex plugin source tree at `src/`. Must in
 - Generated `.codex-plugin/plugin.json` is valid per Codex spec
 - Generated `skills/<name>/SKILL.md` is valid per Codex skills spec
 - Plugin installs cleanly in Codex (smoke test: install + invoke `/<skill-name>`)
-- Plugin metadata matches what was generated for Claude Code (consistency check upstream — links to step 7)
+- Plugin metadata matches what was generated for Claude Code (consistency check upstream — links to step 6)
+- Step 5 emits BOTH `src/README.md` and a root-level `README.md` (identical content; root copy is what step 7 puts in the zip)
 
 ## TDD order
 1. RED: test that emitted `plugin.json` matches Codex schema

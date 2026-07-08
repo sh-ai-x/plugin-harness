@@ -1,42 +1,37 @@
-# Step 6 — implement submission.zip assembly
+# Step 6 — implement log↔plugin↔questionnaire consistency check
 
 ## Goal
-Bundle the generated plugin source + README + logs into `submission.zip` matching the Codex submission spec.
+Before zip assembly (step 7), verify that the logs, the plugin source, and the interview answers all agree. Catch drift before submission rejection. BLOCKING gate — step 7 only runs if this step passes.
 
 ## Inputs
-- `src/` (Claude Code + Codex plugin source from steps 4 + 5)
-- `README.md` (root-level)
-- `logs/` (verbatim AI conversation from the entire run)
+- `interview.json` (5 answers from step 2 or 3)
+- `src/` (generated plugin from steps 4 + 5)
+- `logs/` (verbatim conversation from step 2 or 3)
 
 ## Outputs
-- `submission.zip` with the structure:
-  ```
-  submission.zip
-  ├── src/
-  │   ├── .codex-plugin/plugin.json
-  │   ├── skills/<name>/SKILL.md
-  │   ├── .claude/skills/<name>/SKILL.md
-  │   ├── .mcp.json
-  │   └── ...
-  ├── README.md
-  └── logs/
-      └── <conversation>.md
-  ```
-- Unit tests: zip structure, file presence, no extra files at root
+- Consistency report: pass/fail per check + evidence
+- Blocking on failure (refuse to proceed to step 7 if any HARD-FAIL check fails)
 
 ## Acceptance criteria
-- Zip structure exactly matches Codex submission spec
-- `src/.codex-plugin/plugin.json` is at `src/.codex-plugin/plugin.json` (not nested deeper)
-- `logs/` contains verbatim AI conversation
-- Zip is reproducible (same input → same bytes)
+- Each interview answer appears in the generated SKILL.md body
+- Each SKILL.md feature traces back to an interview answer
+- The logs reference all 5 questions (the conversation actually covered them)
+- The Codex `plugin.json` and Claude Code `.mcp.json` agreement check — **DOWNGRADED-BUT-ACTIVE** (always runs, never silently skipped):
+  - If both `plugin.json` and `.mcp.json` are present → they MUST agree on the plugin's primary entry point (HARD FAIL on mismatch)
+  - If only `plugin.json` is present (Codex-only transport) → log WARNING with "Codex-only transport" allow-state marker, do NOT hard-fail
+  - If only `.mcp.json` is present (Claude-Code-only transport) → log WARNING with "Claude-Code-only transport" allow-state marker, do NOT hard-fail
+- If any HARD-FAIL check fails, exit code 1 + clear error
 
 ## TDD order
-1. RED: test zip has `src/`, `README.md`, `logs/` at root
-2. RED: test that `src/.codex-plugin/plugin.json` is at the right path
-3. RED: test reproducibility (byte-equal on second build)
-4. GREEN: implement zip builder
-5. REFACTOR: normalize file ordering
+1. RED: test that all 5 answers are referenced in the generated plugin
+2. RED: test that the logs mention all 5 questions
+3. RED: test that `plugin.json` and `.mcp.json` agree on entry point (both-present case → hard fail)
+4. RED: test that "Codex-only transport" logs WARNING but passes (warning, not skip)
+5. RED: test that "Claude-Code-only transport" logs WARNING but passes
+6. RED: test that step 7 is BLOCKED on hard-fail
+7. GREEN: implement checker
+8. REFACTOR: pluggable check rules
 
 ## Risks
-- Logs may contain sensitive data — scrub before zip
-- Zip format edge cases (UTF-8 names, large files) — use Python's `zipfile` with proper flags
+- Synonyms / paraphrasing may break the trace — use semantic similarity, not exact match
+- False positives — keep the bar high (don't hard-fail on minor wording diffs)

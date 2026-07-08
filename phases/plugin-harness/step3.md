@@ -12,13 +12,15 @@ Given an idea or company (from CLI), AI searches the web for evidence and fills 
 ## Outputs
 - `/dev-kit:plan-plugin --mode B <idea-or-company>` command
 - `interview.json` with AI-filled answers + evidence URLs
-- Unit tests: each question has evidence, no hallucination, format match
+- `logs/<session-id>.md` (verbatim AI conversation — every user prompt + every assistant response + retrieved evidence URLs)
+- Unit tests: each question has evidence, no hallucination, format match, log capture
 
 ## Acceptance criteria
 - Mode B takes a single input (idea or company name) and produces a full `interview.json`
 - Each answer cites at least 1 web source (URL + retrieval timestamp)
 - If web search fails for a question, fall back to LLM-only with explicit "no evidence" marker
 - Output is interchangeable with mode A output (downstream steps don't care which mode produced it)
+- Verbatim AI conversation captured to `logs/<session-id>.md` (md format, no edits/excerpts)
 
 ## TDD order
 1. RED: test that mode B produces `interview.json` with 5 answers

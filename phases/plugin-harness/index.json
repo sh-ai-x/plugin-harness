@@ -16,8 +16,8 @@
     {"id": "step3", "title": "implement AI web-research fill (mode B — AI-research)", "path": "step3.md", "tdd": "red-green-refactor"},
     {"id": "step4", "title": "implement Claude Code plugin generation", "path": "step4.md", "tdd": "red-green-refactor"},
     {"id": "step5", "title": "implement Codex plugin generation", "path": "step5.md", "tdd": "red-green-refactor"},
-    {"id": "step6", "title": "implement submission.zip assembly", "path": "step6.md", "tdd": "red-green-refactor"},
-    {"id": "step7", "title": "implement log↔plugin↔questionnaire consistency check", "path": "step7.md", "tdd": "red-green-refactor"},
+    {"id": "step6", "title": "implement log↔plugin↔questionnaire consistency check (BLOCKING gate)", "path": "step6.md", "tdd": "red-green-refactor"},
+    {"id": "step7", "title": "implement submission.zip assembly (post-consistency, with log scrubbing)", "path": "step7.md", "tdd": "red-green-refactor"},
     {"id": "step8", "title": "end-to-end smoke test (kill-shot)", "path": "step8.md", "tdd": "scenario"}
   ]
 }

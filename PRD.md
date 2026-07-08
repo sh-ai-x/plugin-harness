@@ -74,14 +74,14 @@ See `phases/plugin-harness/index.json` for the canonical phase manifest. Step fi
 | 3 | implement AI web-research fill (mode B) | AI-driven mode: AI searches web, fills with evidence |
 | 4 | implement Claude Code plugin generation | Emit valid CC skill + .mcp.json |
 | 5 | implement Codex plugin generation | Emit valid Codex plugin (plugin.json + SKILL.md) |
-| 6 | implement submission.zip assembly | Build src/ + README.md + logs/ per Codex spec |
-| 7 | implement log↔plugin↔questionnaire consistency check | Catch drift before submission |
+| 6 | implement log↔plugin↔questionnaire consistency check (BLOCKING) | Catch drift before submission; blocks step 7 on hard-fail |
+| 7 | implement submission.zip assembly | Build src/ + README.md + scrubbed logs/ per Codex spec |
 | 8 | end-to-end smoke test (kill-shot) | 1 real idea, ≤2 person-days, install in both runtimes |
 
 ## 7. Acceptance criteria
 
 1. `/dev-kit:plan-plugin --mode <A|B> <idea-or-company>` runs the 5-question interview (mode A) OR web-research + auto-fill (mode B)
 2. Output installs cleanly in Claude Code AND Codex as a plugin (no dev-kit runtime dep)
-3. Verbatim AI conversation log captured to `logs/` (md/txt/json/jsonl)
+3. Verbatim (scrubbed) AI conversation log captured to `logs/` (md/txt/json/jsonl); secrets, emails, tokens, IPs redacted before submission
 4. `submission.zip` matches Codex spec (`src/` + `README.md` + `logs/`)
-5. logs↔plugin↔questionnaire consistency check passes (no drift)
+5. logs↔plugin↔questionnaire consistency check (step 6) passes BEFORE submission.zip assembly (step 7); hard-fail blocks the zip build
