@@ -236,10 +236,14 @@ jobs:
         run: |
           set -uo pipefail
           # First 'Verdict: <value>' line in the most recent claude[bot] comment.
-          # In track_progress mode the action updates ONE comment per job, so
-          # "most recent" = this job's comment.
+          # track_progress is disabled elsewhere in this workflow; each LLM run
+          # posts a NEW comment, so the API comment list grows monotonically.
+          # We sort by created_at desc + take head -1 so most-recent wins.
+          # (Earlier versions took head -1 of the asc-sorted default, which
+          # got the OLDEST comment; that misbehaved once a previous run left
+          # a non-Approve verdict on the PR.)
           verdict="$(gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
-            --jq '.[] | select((.user.login // "") | startswith("claude")) | .body' \
+            --jq 'sort_by(.created_at) | reverse | .[] | select((.user.login // "") | startswith("claude")) | .body' \
             | grep -E 'Verdict: (Approve|Blocked|Changes Requested)' | head -1 \
             | grep -oE 'Verdict:[[:space:]]*(Approve|Blocked|Changes Requested)' \
             | sed -E 's/.*Verdict:[[:space:]]*//' || true)"
@@ -406,12 +410,12 @@ jobs:
         run: |
           set -uo pipefail
           # First 'Verdict: <value>' line in the most recent claude[bot] comment.
-          # In track_progress mode the action updates ONE comment per job, so
-          # "most recent" = this job's comment (review job's older comments
-          # come before security's in chronological order, so we still want
-          # the latest = security's).
+          # track_progress is disabled elsewhere; each LLM run posts a NEW
+          # comment, so the API list grows. We sort by created_at desc so
+          # head -1 picks the most-recent (this job's own comment), not the
+          # oldest (which would stale-fail on a prior non-Approve verdict).
           verdict="$(gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
-            --jq '.[] | select((.user.login // "") | startswith("claude")) | .body' \
+            --jq 'sort_by(.created_at) | reverse | .[] | select((.user.login // "") | startswith("claude")) | .body' \
             | grep -E 'Verdict: (Approve|Blocked|Changes Requested)' | head -1 \
             | grep -oE 'Verdict:[[:space:]]*(Approve|Blocked|Changes Requested)' \
             | sed -E 's/.*Verdict:[[:space:]]*//' || true)"
