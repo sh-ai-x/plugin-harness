@@ -49,10 +49,24 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Count `auto-fix/iter-*` labels (label-based counter — robust to bot email changes).
-          COUNT=$(gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels" \
+          # Belt-and-braces 5-iter cap. Uses TWO independent counts; either
+          # triggers the cap:
+          #   1. Label-based counter (robust to bot email changes): agent
+          #      only adds labels (allowedTools narrows to --add-label only,
+          #      so --remove-label is no longer permitted), so the count
+          #      is monotonic.
+          #   2. Workflow-run counter (unforgeable: agent cannot delete
+          #      workflow runs): count past auto-fix invocations on this
+          #      PR via gh api; the system tracks this regardless of label
+          #      tampering.
+          # Resolves A06 critical finding (label-existence count bypassable
+          # via gh pr edit --remove-label).
+          LABEL_COUNT=$(gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels" \
             --jq '[.[] | select(.name | startswith("auto-fix/iter-"))] | length')
-          echo "Auto-fix iterations so far: $COUNT"
+          RUN_COUNT=$(gh api "repos/${{ github.repository }}/actions/runs?event=pull_request_review" \
+            --paginate --jq '[.workflow_runs[] | select(.name == "Auto-fix on review") | select(.pull_requests[]?.number == '"${{ github.event.pull_request.number }}"')] | length' 2>/dev/null || echo 0)
+          COUNT=$(( LABEL_COUNT > RUN_COUNT ? LABEL_COUNT : RUN_COUNT ))
+          echo "Auto-fix iterations: labels=$LABEL_COUNT  runs=$RUN_COUNT  effective=$COUNT"
           if [ "$COUNT" -ge 5 ]; then
             echo "::warning::Reached 5 auto-fix iterations. Stopping to avoid infinite loop. Human review required."
             gh pr comment "${{ github.event.pull_request.number }}" \
@@ -145,7 +159,7 @@ jobs:
             a Markdown bullet list mapping each finding → fix (or "deferred
             because …" if you couldn't address it).
           claude_args: |
-            --allowedTools "Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr edit:*),Read,Edit,Write,Grep,Glob"
+            --allowedTools "Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr edit --add-label:*),Read,Edit,Write,Grep,Glob"
 
       - name: Verify fix touches only allowed paths
         if: always()

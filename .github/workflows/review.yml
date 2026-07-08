@@ -92,6 +92,11 @@ jobs:
       # Used by the consumer-install branch of the install step below when
       # the dev-harness-kit source is private. Optional for self-install.
       DEV_KIT_GITHUB_TOKEN: ${{ secrets.DEV_KIT_GITHUB_TOKEN }}
+      # Pin dev-harness-kit to a specific commit SHA. Bump this when
+      # upstream dev-kit releases a security or template update; bumping
+      # forces a refresh in every consumer repo on the next CI run.
+      # Resolves security finding A08/A03 (unpinned plugin install).
+      DEV_KIT_REF: f029fb2113d00a25f7e742c1cafecefe318b8859
     steps:
       - uses: actions/checkout@v4
         with:
@@ -124,10 +129,14 @@ jobs:
               echo "  Settings → Secrets and variables → Actions."
               exit 1
             fi
-            echo "::notice::dev-kit consumer-install: cloning sh-ai-x/dev-harness-kit via DEV_KIT_GITHUB_TOKEN"
-            git clone --depth 1 \
+            echo "::notice::dev-kit consumer-install: cloning sh-ai-x/dev-harness-kit at pinned SHA $DEV_KIT_REF"
+            # Full clone (not --depth 1) so we can checkout the pinned SHA.
+            # Resolves A08/A03 critical finding (unpinned plugin install =
+            # upstream compromise = RCE under consumer CI identity).
+            git clone \
               "https://x-access-token:${DEV_KIT_GITHUB_TOKEN}@github.com/sh-ai-x/dev-harness-kit.git" \
               ~/.claude/plugins/marketplaces/dev-kit
+            git -C ~/.claude/plugins/marketplaces/dev-kit checkout "$DEV_KIT_REF"
           fi
           # Always verify the install succeeded (catches both paths).
           test -f ~/.claude/plugins/marketplaces/dev-kit/.claude-plugin/plugin.json
@@ -306,6 +315,9 @@ jobs:
     env:
       MINIMAX_BASE_URL: https://api.minimax.io/anthropic
       DEV_KIT_GITHUB_TOKEN: ${{ secrets.DEV_KIT_GITHUB_TOKEN }}
+      # Pin dev-harness-kit to a specific commit SHA (shared with the review
+      # job above; see that env var for context).
+      DEV_KIT_REF: f029fb2113d00a25f7e742c1cafecefe318b8859
     steps:
       - uses: actions/checkout@v4
         with:
@@ -338,10 +350,14 @@ jobs:
               echo "  Settings → Secrets and variables → Actions."
               exit 1
             fi
-            echo "::notice::dev-kit consumer-install: cloning sh-ai-x/dev-harness-kit via DEV_KIT_GITHUB_TOKEN"
-            git clone --depth 1 \
+            echo "::notice::dev-kit consumer-install: cloning sh-ai-x/dev-harness-kit at pinned SHA $DEV_KIT_REF"
+            # Full clone (not --depth 1) so we can checkout the pinned SHA.
+            # Resolves A08/A03 critical finding (unpinned plugin install =
+            # upstream compromise = RCE under consumer CI identity).
+            git clone \
               "https://x-access-token:${DEV_KIT_GITHUB_TOKEN}@github.com/sh-ai-x/dev-harness-kit.git" \
               ~/.claude/plugins/marketplaces/dev-kit
+            git -C ~/.claude/plugins/marketplaces/dev-kit checkout "$DEV_KIT_REF"
           fi
           # Always verify the install succeeded (catches both paths).
           test -f ~/.claude/plugins/marketplaces/dev-kit/.claude-plugin/plugin.json
