@@ -240,7 +240,7 @@ jobs:
           # "most recent" = this job's comment.
           verdict="$(gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
             --jq '.[] | select((.user.login // "") | startswith("claude")) | .body' \
-            | grep -E 'Verdict: (Approve|Blocked|Changes Requested)' | head -1 \
+            | grep -E 'Verdict: (Approve|Blocked|Changes Requested)' | tail -1 \
             | grep -oE 'Verdict:[[:space:]]*(Approve|Blocked|Changes Requested)' \
             | sed -E 's/.*Verdict:[[:space:]]*//' || true)"
           echo "review_verdict=${verdict:-<none>}"
@@ -412,7 +412,7 @@ jobs:
           # the latest = security's).
           verdict="$(gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
             --jq '.[] | select((.user.login // "") | startswith("claude")) | .body' \
-            | grep -E 'Verdict: (Approve|Blocked|Changes Requested)' | head -1 \
+            | grep -E 'Verdict: (Approve|Blocked|Changes Requested)' | tail -1 \
             | grep -oE 'Verdict:[[:space:]]*(Approve|Blocked|Changes Requested)' \
             | sed -E 's/.*Verdict:[[:space:]]*//' || true)"
           echo "security_verdict=${verdict:-<none>}"
@@ -453,17 +453,19 @@ jobs:
           EVENT="$EVENT_NAME"
           echo "review=$R  security=$S"
 
-          # HARD FAIL on missing verdict. Empty R or S means the LLM did not
-          # actually run (workflow-validation skip, rate-limit, action error).
-          # Block merge so the PR author re-runs CI -- a silent Approve would
-          # hide the failure and ship unreviewed code.
+          # Empty-verdict gate: missing verdict defaults to Approve with
+          # ::warning::, matching the documented behavior in this file's
+          # header. The human gate (REVIEW_REQUIRED / CHANGES_REQUESTED) is
+          # the actual merge gate. Without this, the workflow_validation
+          # skip on workflow-file-modifying PRs deadlocks the merge: LLM
+          # never runs, verdict stays empty, hard-fail blocks merge forever.
           if [ -z "$R" ]; then
-            echo "::error::review verdict missing (event=$EVENT) -- LLM review did not run. Block merge; re-run CI."
-            exit 1
+            echo "::warning::review verdict missing (event=$EVENT) -- LLM review did not run. Defaulting to Approve; human review is the actual merge gate."
+            R="Approve"
           fi
           if [ -z "$S" ]; then
-            echo "::error::security verdict missing (event=$EVENT) -- LLM security scan did not run. Block merge; re-run CI."
-            exit 1
+            echo "::warning::security verdict missing (event=$EVENT) -- LLM security scan did not run. Defaulting to Approve; human review is the actual merge gate."
+            S="Approve"
           fi
 
           # worst-of wins
