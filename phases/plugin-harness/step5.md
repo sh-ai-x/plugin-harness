@@ -26,14 +26,15 @@ Given `interview.json`, emit a valid Codex plugin source tree at `src/`. Must in
 - Generated `skills/<name>/SKILL.md` is valid per Codex skills spec
 - Plugin installs cleanly in Codex (smoke test: install + invoke `/<skill-name>`)
 - Plugin metadata matches what was generated for Claude Code (consistency check upstream — links to step 6). Even in the no-MCP case (Codex-only transport), `plugin.json`'s `primary_entry_point` must equal the `primary_entry_point` field in `interview.json` (step 6 verifies this even when `.mcp.json` is absent)
-- Step 5 emits BOTH `src/README.md` and a root-level `README.md` (identical content; root copy is for local repo discoverability — there is no zip step in this pipeline)
+- Step 5 emits `src/README.md` ONLY (root-level README was removed in iteration 2 — see "Removed" note below; there is no zip step in this pipeline)
 
 ## TDD order
-1. RED: test that emitted `plugin.json` matches Codex schema
+1. RED: test that emitted `plugin.json` matches Codex schema (including `primary_entry_point` field)
 2. RED: test that SKILL.md is valid per Codex format
-3. RED: test that plugin name and version match across runtimes
-4. GREEN: implement emitter
-5. REFACTOR: extract a shared `Metadata` dataclass (fields: `name`, `version`, `primary_entry_point`, `description`) populated from `interview.json`. Both step 4 and step 5 format the same `Metadata` into their respective runtime shapes (Codex `plugin.json` shape vs Claude Code `.mcp.json` shape). The shared module is the single source of truth; only the FORMAT MAPPING differs.
+3. GREEN: implement emitter (uses `Metadata` from shared module — fields: name, version, primary_entry_point, description)
+4. REFACTOR: extract `Metadata` dataclass (shared with step 4 — single source of truth; only the format mapping differs)
+
+> **Removed from step 5**: "plugin name/version match across runtimes" test. That test requires comparing step 4 and step 5 outputs at the file level, which step 5 cannot do (it only reads `interview.json`, by design — see leaky-contracts note above). The cross-runtime test is the responsibility of step 6 (consistency check), where the comparison actually happens.
 
 ## Risks
 - Codex spec may change — pin version
