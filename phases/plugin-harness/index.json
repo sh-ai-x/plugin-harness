@@ -1,0 +1,112 @@
+{
+  "phase": "plugin-harness",
+  "prd": "PRD.md",
+  "decision_log": ".prd/decision-log.md",
+  "methodology": "tdd",
+  "steps": [
+    {
+      "id": "step1",
+      "title": "Scaffold the 6-question interview",
+      "phase": "A",
+      "outputs": [
+        ".prd/interview-<slug>.md"
+      ],
+      "verification": "contract: each question emits a stable key (q1..q6) + answer recorded as JSONL line in .prd/interview-<slug>.log",
+      "depends_on": []
+    },
+    {
+      "id": "step2",
+      "title": "Persist answers + emit interview-recap",
+      "phase": "A",
+      "outputs": [
+        ".prd/interview-<slug>.md",
+        ".prd/interview-<slug>.log"
+      ],
+      "verification": "scenario: walk all 6 questions, assert recap renders non-empty",
+      "depends_on": [
+        "step1"
+      ]
+    },
+    {
+      "id": "step3",
+      "title": "Generate Claude-side plugin manifest",
+      "phase": "B",
+      "outputs": [
+        "claude-side/.claude-plugin/plugin.json",
+        "claude-side/skills/<name>/SKILL.md"
+      ],
+      "verification": "contract: .claude-plugin/plugin.json parses; schema matches Claude plugin spec",
+      "depends_on": [
+        "step2"
+      ]
+    },
+    {
+      "id": "step4",
+      "title": "Generate Codex-side plugin manifest",
+      "phase": "B",
+      "outputs": [
+        "codex-side/src/.codex-plugin/plugin.json",
+        "codex-side/src/skills/<name>/SKILL.md"
+      ],
+      "verification": "contract: .codex-plugin/plugin.json parses; schema matches Codex plugin spec",
+      "depends_on": [
+        "step2"
+      ]
+    },
+    {
+      "id": "step5",
+      "title": "MCP shape adapter",
+      "phase": "B",
+      "outputs": [
+        "claude-side/.mcp.json",
+        "codex-side/src/.mcp.json"
+      ],
+      "verification": "contract: both .mcp.json pass mcp-shape validator; server names mirror across both",
+      "depends_on": [
+        "step3",
+        "step4"
+      ]
+    },
+    {
+      "id": "step6",
+      "title": "Author SKILL.md from interview Q1+Q4",
+      "phase": "C",
+      "outputs": [
+        "shared/skills/<name>/SKILL.md"
+      ],
+      "verification": "scenario: SKILL.md frontmatter parses; description mirrors Q1 (intent) and references Q4 (verification)",
+      "depends_on": [
+        "step5"
+      ]
+    },
+    {
+      "id": "step7",
+      "title": "Author scenario test from interview Q1+Q4",
+      "phase": "C",
+      "outputs": [
+        "tests/scenario/<name>.md"
+      ],
+      "verification": "scenario: scenario dry-run returns intent-key match against Q1",
+      "depends_on": [
+        "step6"
+      ]
+    },
+    {
+      "id": "step8",
+      "title": "AC1/2/3 self-check + registration checklist",
+      "phase": "D",
+      "outputs": [
+        ".dev-kit/ac-status.json"
+      ],
+      "verification": "scenario: AC1=green, AC3=green, AC2=manual-pending. Registration checklist present.",
+      "depends_on": [
+        "step7"
+      ]
+    }
+  ],
+  "boundary_conditions": {
+    "enter_step3": "step2 outputs present + parsed",
+    "enter_step5": "step3 + step4 manifests both valid",
+    "enter_step8": "step7 scenario dry-run green"
+  }
+}
