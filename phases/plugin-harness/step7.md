@@ -27,6 +27,12 @@ Close AC3 ("skill-invoke time → behaves as designed") by emitting a scenario t
 ## Out of scope
 - No AC status board yet (step8).
 
-## Iron-law checklist
-- L1: contract + scenario.
-- L4: no TODOs.
+## Threat model (scenario-test integrity)
+
+| # | Rule | Where it lives |
+|---|---|---|
+| 1 | **Scenario file path containment.** `tests/scenario/<name>.md` slug must pass the same resolve+relative-to check (step1 rule 1). | step1 test file |
+| 2 | **Intent-key determinism.** `intent_key` in the scenario is the SHA-256 prefix of the normalized Q1 intent, not the raw Q1 string. Two PRs with same intent at Q1 must produce same `intent_key`. | `tests/contract/test_intent_key_determinism.py` |
+| 3-9 | Inherit step1-6 rules. | step1-6 test files |
+
+**Why this matters.** Security finding 1 (`tests/scenario/name.md`) was flagged for the same path-traversal surface as the manifest paths. Rule 1 closes that. Rule 2 makes the intent-key a stable hash, so AC3 verification can compare across runs without leaking Q1's verbatim text into scenario dry-run outputs.

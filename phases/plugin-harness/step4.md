@@ -31,6 +31,12 @@ From the same `.prd/interview-<slug>.recap.md`, emit a valid `codex-side/src/.co
 - No scenario-test authoring for the skill (step7).
 - No cross-target lock (step5 enforces it via `.mcp.json` shape).
 
-## Iron-law checklist
-- L1: contract + scenario.
-- L4: stub is intentional.
+## Threat model (mirror of step3, Codex-side)
+
+| # | Rule | Where it lives |
+|---|---|---|
+| 1 | **Path containment at write time.** `codex-side/src/skills/<name>/SKILL.md` and `codex-side/src/.codex-plugin/plugin.json` paths MUST go through `pathlib.Path(name).resolve().relative_to(project_root)`; reject `..` or absolute prefix. | `tests/contract/test_codex_path_containment.py` |
+| 2-5 | Inherit step1+step2 rules (secret redaction, log integrity, frontmatter escaping, recap PII cap). | step1.md / step2.md test files |
+| 6 | **Cross-target name consistency.** `codex-side/src/.codex-plugin/plugin.json::name` MUST equal `claude-side/.claude-plugin/plugin.json::name` byte-equal (also enforced in step5 via `.mcp.json` mirror). No `name` divergence between Claude and Codex manifests. | `tests/contract/test_dual_target_name.py` |
+
+**Why this matters.** Security finding 1 in PR #4 named `step4.md:19` as well. Mirror of step3 rule 1 — same resolve+relative-to check on the Codex side. Rule 6 keeps `name` consistent so both sides stay discoverable as the same plugin in their marketplaces.

@@ -31,6 +31,11 @@ From `.prd/interview-<slug>.recap.md`, emit a valid `claude-side/.claude-plugin/
 - No MCP wiring yet (step5).
 - No scenario-test authoring for the skill (step7).
 
-## Iron-law checklist
-- L1: covered (contract + scenario).
-- L4: stub is intentional (Phase B first cut), not "we'll extend later".
+## Threat model (inherits + adds Claude-side path-containment binding)
+
+| # | Rule | Where it lives |
+|---|---|---|
+| 1 | **Path containment at write time.** `claude-side/skills/<name>/SKILL.md` and `claude-side/.claude-plugin/plugin.json` paths derived from interview `<name>` slug MUST go through `pathlib.Path(name).resolve().relative_to(project_root)`; reject if `..` in input or resolved path escapes project_root. | `tests/contract/test_claude_path_containment.py` |
+| 2-5 | Inherit step1 rules 2-4 and step2 rule 5 (secret redaction, log integrity, frontmatter escaping, recap PII cap). | step1.md / step2.md test files |
+
+**Why this matters.** Security finding 1 in PR #4 explicitly named `step3.md:19` (`claude-side/skills/name/SKILL.md`) as the path-traversal surface. Adding the resolve+relative-to check at write is the actual fix.

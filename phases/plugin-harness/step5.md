@@ -32,6 +32,12 @@ If the interview (Q3 — "how does the plugin work?") implies an MCP server, gen
 - No skill content authoring (step6).
 - No scenario-test authoring for the skill (step7).
 
-## Iron-law checklist
-- L1: contract + scenario.
-- L4: no TODOs.
+## Threat model (cross-target mirror)
+
+| # | Rule | Where it lives |
+|---|---|---|
+| 1 | **MCP server-name equivalence.** Server `name`s in `claude-side/.mcp.json` and `codex-side/src/.mcp.json` MUST be set-equal. No silent divergence. | `tests/contract/test_mcp_name_mirror.py` (renamed from `test_mcp_shape.py` for clarity) |
+| 2 | **Transport equivalence.** Transports (`stdio` / `http`) for each server name MUST match across both sides. A name present on one side with `stdio` but `http` on the other is hard-fail (silent mismatch). | `tests/contract/test_mcp_transport_mirror.py` |
+| 3-7 | Inherit step1+2+3+4 rules (path containment, secret redaction, log integrity, frontmatter escaping, recap PII cap, name consistency). | step1-4 test files |
+
+**Why this matters.** Step5 is the cross-target lock. Security finding 7 in PR #4 didn't flag MCP specifically, but the dual-target name + transport equivalence is the gate that catches the next class of "one side silent drift" bugs.

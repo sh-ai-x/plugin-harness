@@ -31,7 +31,11 @@ Take the 6 question stubs from step1, capture the author's answers (manual edit 
 - No manifest generation (Phase B).
 - No skill generation (Phase C).
 
-## Iron-law checklist
-- L1: covered (scenario + contract).
-- L3: enforced by harness-runner.
-- L4: no TODOs.
+## Threat model (cross-step; pulls rules from step1 + adds recap-PII rules)
+
+| # | Rule (inherits + extends) | Where it lives |
+|---|---|---|
+| 1-4 | Inherit all step1 threat-model rules (path containment, secret redaction, log integrity, frontmatter escaping). | step1.md test files |
+| 5 | **Recap PII propagation cap.** `intent_keyword`, `audience`, `verification_keyword` extracted into `.prd/interview-<slug>.recap.md` are capped at 240 chars each, lowercased, and stripped of any 9+ digit run (likely PII — phone, ID, SSN-like). This blocks the A09-major finding that PII-bearing Q1 strings propagate verbatim into manifest description → SKILL.md → marketplace index. | `tests/contract/test_recap_pii.py` |
+
+**Why this matters.** Security finding 6 in PR #4 (`/dev-kit:security`) called out that `intent_keyword` flows unchanged from Q1 answer into the manifest and then the marketplace description. Capping + normalization at recap-emit is the earliest, cheapest stage to clamp it.

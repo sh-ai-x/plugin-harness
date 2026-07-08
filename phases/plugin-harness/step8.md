@@ -30,7 +30,12 @@ Emit `.dev-kit/ac-status.json` with the three ACs marked GREEN (or manual-pendin
 ## Out of scope
 - No marketplace automation — non-goal #2 forbids it.
 
-## Iron-law checklist
-- L1: scenario + contract.
-- L3: status board is the verification artifact for hand-off.
-- L4: no TODOs.
+## Threat model (status-board integrity)
+
+| # | Rule | Where it lives |
+|---|---|---|
+| 1 | **Log chain-hash assert.** Before AC status emission, `.dev-kit/ac-status.json` writer verifies the `.prd/interview-<slug>.log` HMAC chain (step1 rule 3). If any line fails, emit a top-level `AC0=red` row + refuse to write AC status as `green`. | `tests/contract/test_ac_log_chain.py` |
+| 2 | **Status-board writable only by build orchestrator.** `.dev-kit/ac-status.json` file mode `0600`; owner = build-runner uid; refuses write if existing file mode widens to `0644`+. | `tests/contract/test_ac_status_mode.py` |
+| 3-10 | Inherit step1-7 rules (all of them). | step1-7 test files |
+
+**Why this matters.** Security finding 3 (`AC3 verification authority is the harness itself`) and finding 7 (`.prd/interview-<slug>.log` mutable scratch) both point at step8 — this is where AC status is declared. Rule 1 ties log integrity to AC verdict (so a tampered log cannot pass AC). Rule 2 prevents a misconfigured step from leaking intent_key to a wider reader.
