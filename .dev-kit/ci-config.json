@@ -1,5 +1,4 @@
 {
-  "ci_setup_version": "0.1.0",
   "githooks": [
     ".githooks/pre-push"
   ],
@@ -10,7 +9,7 @@
     "hooks/lib/worktree-detect.sh",
     "hooks/hooks.json"
   ],
-  "installed_at": "2026-07-08T12:57:04Z",
+  "installed_at": "2026-07-08T05:46:11Z",
   "installed_by": "dev-kit:ci-setup",
   "rules": [
     ".claude/rules/git-workflow.md"
