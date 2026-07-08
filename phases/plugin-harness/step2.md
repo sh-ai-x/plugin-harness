@@ -10,13 +10,15 @@ CLI that runs the 5-question interview; user fills answers directly. Persists an
 ## Outputs
 - `/dev-kit:plan-plugin --mode A <idea-or-company>` command
 - `interview.json` with user-filled answers
-- Unit tests: prompt order, required fields, persistence, resume
+- `logs/<session-id>.md` (verbatim AI conversation — every user prompt + every assistant response)
+- Unit tests: prompt order, required fields, persistence, resume, log capture
 
 ## Acceptance criteria
 - CLI asks all 5 questions in order
 - User can save mid-interview and resume
 - All answers validate against the `questions.json` schema
 - Output `interview.json` is JSON-serializable + human-readable
+- Verbatim AI conversation captured to `logs/<session-id>.md` (md format, no edits/excerpts)
 
 ## TDD order
 1. RED: test that CLI asks all 5 questions in order
