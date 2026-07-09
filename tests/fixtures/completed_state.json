@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "cursor": 5,
+  "canonical_ids": [
+    "what-who-where",
+    "why-this-problem",
+    "how-it-works",
+    "ai-usage",
+    "how-verified"
+  ],
+  "answers": {
+    "what-who-where": "growth marketer uses this plugin during the weekly standup to summarize last week's wins",
+    "why-this-problem": "context switching between ChatGPT and Notion AI wastes the team more than five hours per week",
+    "how-it-works": "plugin collects the user's standup notes from a local markdown file and emits a single digest",
+    "ai-usage": "the runtime tool surface is called once to summarize the weekly digest into bullet form",
+    "how-verified": "manual smoke test against the prior week's standup transcript plus a five-user beta review"
+  }
+}
