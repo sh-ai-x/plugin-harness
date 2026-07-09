@@ -10,7 +10,12 @@ from .questions import DEFAULT_MAX_LENGTH, QUESTIONS, canonical_ids, get_questio
 # = 10_000 chars — well within 'multi-paragraph idea' territory,
 # tight enough to bound the memory-exhaustion DoS surface that
 # unbounded input on a documented user-input trust boundary exposed.
-MAX_TOTAL_PAYLOAD = DEFAULT_MAX_LENGTH * len(QUESTIONS)
+# PR #21 round 5: pin MAX_TOTAL_PAYLOAD as an independent constant.
+# The previous formula (DEFAULT_MAX_LENGTH * len(QUESTIONS)) auto-grew
+# with the schema; adding a question would silently raise the cap and
+# re-open the DoS surface. 10_000 chars (5 * 2000) is the explicit
+# round-3 bound; tests assert this constant directly.
+MAX_TOTAL_PAYLOAD = 10000
 
 
 class SchemaError(Exception):
@@ -76,10 +81,13 @@ class InterviewState:
         self._cursor += 1
 
     def set_answer(self, qid: str, value: Any) -> None:
-        # PR #21 review (security round 3, major): caller can no longer
-        # record an out-of-order answer. The qid MUST match the current
-        # cursor's canonical question; otherwise a caller could answer
-        # Q4 first and reach is_complete() while skipping Q0-Q3.
+        # PR #21 round 5 (🟠 major): unknown-id must be reported before
+        # out-of-order. The previous ordering made "unknown qid" surface
+        # as a misleading "out of order" message because the order
+        # check ran first. Now _lookup_question runs first so an
+        # unknown id raises SchemaError('unknown question id') even when
+        # it also happens to differ from the cursor's expected qid.
+        question = self._lookup_question(qid)  # raises SchemaError on unknown id
         ids = canonical_ids()
         if self._cursor >= len(ids):
             raise SchemaError(
@@ -91,7 +99,6 @@ class InterviewState:
                 f"set_answer out of order: expected {expected!r} at cursor "
                 f"{self._cursor}, got {qid!r}"
             )
-        question = self._lookup_question(qid)  # raises SchemaError on unknown id
         if not self.validate_answer(qid, value):
             n = len(value) if isinstance(value, str) else 0
             raise ValidationError(
@@ -153,8 +160,6 @@ class InterviewState:
                     f"payload answer for {qid!r}: must be str, "
                     f"got {type(value).__name__}"
                 )
-            if not get_question(qid):  # pragma: no cover (already filtered above)
-                raise SchemaError(f"unknown question id: {qid!r}")
             if not InterviewState.validate_answer(qid, value):
                 raise ValidationError(
                     f"payload answer for {qid!r} fails validation"
