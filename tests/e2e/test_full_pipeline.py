@@ -92,3 +92,28 @@ def test_full_pipeline_runtime_parity(plugin_output: pathlib.Path) -> None:
         "if these are now byte-identical, the dual-runtime contract "
         "test is weakened — bodies alone should be compared"
     )
+
+
+# ---------- PR #27 review regression ----------
+def test_cc_and_codex_skill_bodies_byte_identical_post_frontmatter():
+    """🟠 major: dual-runtime SKILL.md bodies must be byte-identical
+    after front-matter stripping. This is the e2e parity contract.
+    """
+    cc = pathlib.Path("/Users/sanghee/dev/plugin-harness/.claude/worktrees/0-mvp-step6/src/adapter/cc_skills/plugin-harness/SKILL.md")
+    cx = pathlib.Path("/Users/sanghee/dev/plugin-harness/.claude/worktrees/0-mvp-step6/src/adapter/codex_skills/plugin-harness/SKILL.md")
+    assert cc.is_file() and cx.is_file()
+
+    def _body(t):
+        lines = t.splitlines(keepends=True)
+        if not lines or lines[0].strip() != "---":
+            return t
+        for i in range(1, len(lines)):
+            if lines[i].strip() == "---":
+                return "".join(lines[i + 1:])
+        return t
+
+    cc_body = _body(cc.read_text(encoding="utf-8"))
+    cx_body = _body(cx.read_text(encoding="utf-8"))
+    assert cc_body == cx_body, (
+        f"CC body ({len(cc_body)}) != Codex body ({len(cx_body)})"
+    )

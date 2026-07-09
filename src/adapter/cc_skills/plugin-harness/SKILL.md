@@ -5,30 +5,43 @@ description: Plan and emit a new plugin from a one-line idea using the 5-questio
 
 # plugin-harness
 
-Drive the plugin-harness engine in skill mode. When the user describes an idea
-for a new plugin and wants guided ideation, run the engine:
+This skill drives the plugin-harness interview and emits a dual-runtime
+(Codex + Claude Code) plugin. It is the surface for the same engine that
+the CC slash command exposes — one engine, two runtimes.
+
+## When to use this skill
+
+Use this skill when the user asks to:
+
+- author or scaffold a Codex / Claude Code plugin from an idea
+- run the 5-question interview (`what-who-where`, `why-this-problem`,
+  `how-it-works`, `ai-usage`, `how-verified`)
+- assemble or emit a plugin layout that installs identically in both
+  CC and Codex
+
+Do not use this skill for general code questions, plugin maintenance, or
+any task that is not a fresh ideation-to-plugin flow.
+
+## Invocation
+
+Run the shared engine. The engine handles argparse, dispatch, and
+serialization; the adapter only installs the surface.
 
 ```bash
 python -m src.engine.cli new "<one-line idea>" --mode user
 ```
 
-## When to use
+Modes:
 
-- The user describes an idea for a new Claude Code or Codex plugin.
-- The user wants the 5-question interview (what/who/where · why-this-problem ·
-  how-it-works · ai-usage · how-verified) instead of free-form ideation.
+- `--mode user` — prompts one question at a time, reads stdin (default).
+- `--mode ai-research` — drafts answers from the runtime's tool surface.
 
-## What it does
+The CLI exits 0 on a complete 5-answer interview and emits the plugin
+layout under the configured output directory.
 
-1. Runs the 5-question interview to capture the user's intent.
-2. Assembles the idea plan as a Markdown document.
-3. Emits the plugin files in the Codex layout: `src/.codex-plugin/plugin.json`,
-   `src/skills/<slug>/SKILL.md`, `src/.mcp.json`, and `README.md`.
+## Notes
 
-## Engine entrypoint
-
-```bash
-python -m src.engine.cli new "<idea>" [--mode user|ai-research]
-```
-
-The skill and the `/plugin-harness` slash command share this same entrypoint.
+- The skill is installed at `.agents/skills/plugin-harness/SKILL.md`,
+  the canonical Codex path per https://developers.openai.com/codex/skills.
+- Re-running the install is idempotent — it overwrites the same file.
+- No external runtime dependencies beyond Python 3 and the engine CLI.
