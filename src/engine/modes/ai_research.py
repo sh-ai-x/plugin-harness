@@ -48,4 +48,10 @@ def is_default_surface(surface: Any) -> bool:
     return isinstance(surface, DefaultToolSurface)
 
 
-__all__ = ["DefaultToolSurface", "make_tool_surface", "is_default_surface"]
+__all__ = ["DefaultToolSurface", "make_tool_surface"]
+
+# PR #22 round 9: register this mode's setup with the dispatch table.
+from src.engine.modes import register_mode
+def _setup_ai_research_mode(_make_reader, _make_writer, make_tool_surface):
+    return None, None, make_tool_surface(None)
+register_mode("ai-research", _setup_ai_research_mode)

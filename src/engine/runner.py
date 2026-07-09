@@ -32,6 +32,14 @@ StdoutWriter = Callable[[str], None]
 from src.engine.errors import InterviewIncompleteError, UserAbortError  # noqa: F401
 
 
+# PR #22 round 8/9: cap on the `idea` parameter. CLI layer caps at
+# MAX_IDEA_LENGTH = 2000 (its argparse type); run_interview is a
+# defense-in-depth secondary check at the same threshold so library
+# callers that bypass the CLI cannot drive unbounded f-string
+# allocation through DefaultToolSurface.
+MAX_IDEA_LEN = 2000
+
+
 def run_interview(
     state: InterviewState,
     mode: str,
@@ -52,6 +60,15 @@ def run_interview(
         - UserAbortError when mode="user" and stdin closes early (propagated from the reader).
         - InterviewIncompleteError when an answer is missing/invalid before completion.
     """
+    # PR #22 round 8/9: defense-in-depth cap on the `idea` parameter.
+    # CLI layer also caps at MAX_IDEA_LENGTH (argparse type=); this
+    # is the secondary check at the same threshold for library
+    # callers that bypass the CLI.
+    if len(idea) > MAX_IDEA_LEN:
+        raise InterviewIncompleteError(
+            f"idea parameter exceeds MAX_IDEA_LEN={MAX_IDEA_LEN} chars"
+        )
+
     # PR #22 round 8 (major #3): mode list lifted into
     # src/engine/modes/__init__.py as the single source of truth.
     from src.engine.modes import MODES
