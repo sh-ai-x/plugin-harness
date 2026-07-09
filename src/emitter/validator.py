@@ -122,17 +122,25 @@ def validate_emit(output_dir: Path) -> ValidationReport:
             errors.append(".mcp.json.mcpServers must be an array")
 
     # ------------------------------------------------------------ SKILL.md non-empty
-    if not skill_md.is_file():
-        errors.append(f"SKILL.md missing at {skill_md}")
-        return ValidationReport(ok=False, errors=errors)
-    if skill_md.stat().st_size == 0:
+    # PR #27 round 6 (TOCTOU): the redundant is_file() re-check that
+    # previously guarded stat() was removed in round 5; replaced with a
+    # try/except OSError around stat() so a missing-file race produces
+    # a clean error rather than crashing the validator mid-walk.
+    try:
+        skill_size = skill_md.stat().st_size
+    except OSError as exc:
+        errors.append(f"SKILL.md stat failed at {skill_md}: {exc}")
+        skill_size = 0
+    if skill_size == 0:
         errors.append(f"SKILL.md is empty at {skill_md}")
 
     # ------------------------------------------------------------ README.md non-empty
-    if not readme_path.is_file():
-        errors.append(f"README.md missing at {readme_path}")
-        return ValidationReport(ok=False, errors=errors)
-    if readme_path.stat().st_size == 0:
+    try:
+        readme_size = readme_path.stat().st_size
+    except OSError as exc:
+        errors.append(f"README.md stat failed at {readme_path}: {exc}")
+        readme_size = 0
+    if readme_size == 0:
         errors.append(f"README.md is empty at {readme_path}")
 
     return ValidationReport(ok=not errors, errors=errors)

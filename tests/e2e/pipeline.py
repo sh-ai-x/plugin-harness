@@ -27,6 +27,8 @@ regressions where the interview grows past 5 questions).
 from __future__ import annotations
 
 import pathlib
+
+from tests.e2e._yaml import extract_body as _extract_body
 from typing import Callable, List
 
 from src.adapter.cc import register_cc
@@ -102,21 +104,6 @@ def _run_interview_scripted() -> InterviewState:
     return state
 
 
-def _extract_body(text: str) -> str:
-    """Return the document body (everything after YAML front-matter).
-
-    A document with front-matter begins with `---` on line 1 and
-    closes front-matter at the next `---` on its own line. If no
-    front-matter is detected, the whole document is returned
-    unchanged so naive comparisons stay meaningful.
-    """
-    lines = text.splitlines(keepends=True)
-    if not lines or lines[0].strip() != "---":
-        return text
-    for i in range(1, len(lines)):
-        if lines[i].strip() == "---":
-            return "".join(lines[i + 1:])
-    return text
 
 
 _CC_SKILL_REL = pathlib.Path(".claude/skills/plugin-harness/SKILL.md")

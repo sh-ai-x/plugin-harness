@@ -12,6 +12,7 @@ the failing stage in the pytest summary instead of one giant
 from __future__ import annotations
 
 import pathlib
+from tests.e2e._yaml import extract_body
 
 import pytest
 
@@ -70,17 +71,8 @@ def test_full_pipeline_runtime_parity(plugin_output: pathlib.Path) -> None:
     codex_text = codex_skill.read_text(encoding="utf-8")
 
     # Strip front-matter (both files have a `---`-bounded YAML block at the top).
-    def _body(s: str) -> str:
-        lines = s.splitlines(keepends=True)
-        if not lines or lines[0].strip() != "---":
-            return s
-        for i in range(1, len(lines)):
-            if lines[i].strip() == "---":
-                return "".join(lines[i + 1:])
-        return s
-
-    cc_body = _body(cc_text)
-    codex_body = _body(codex_text)
+    cc_body = extract_body(cc_text)
+    codex_body = extract_body(codex_text)
     assert cc_body == codex_body, (
         f"runtime parity violated: CC body ({len(cc_body)} bytes) != "
         f"Codex body ({len(codex_body)} bytes)"
@@ -98,22 +90,21 @@ def test_full_pipeline_runtime_parity(plugin_output: pathlib.Path) -> None:
 def test_cc_and_codex_skill_bodies_byte_identical_post_frontmatter():
     """🟠 major: dual-runtime SKILL.md bodies must be byte-identical
     after front-matter stripping. This is the e2e parity contract.
+
+    Resolve the bundled SKILL.md paths relative to this test file so the
+    suite runs on any machine, not just the author's macOS worktree
+    (PR #27 round 6 critical: hardcoded absolute path is a regression
+    that also leaks the author's local directory layout).
     """
-    cc = pathlib.Path("/Users/sanghee/dev/plugin-harness/.claude/worktrees/0-mvp-step6/src/adapter/cc_skills/plugin-harness/SKILL.md")
-    cx = pathlib.Path("/Users/sanghee/dev/plugin-harness/.claude/worktrees/0-mvp-step6/src/adapter/codex_skills/plugin-harness/SKILL.md")
-    assert cc.is_file() and cx.is_file()
+    here = pathlib.Path(__file__).resolve().parent
+    repo_root = here.parents[1]  # tests/e2e -> repo root
+    cc = repo_root / "src" / "adapter" / "cc_skills" / "plugin-harness" / "SKILL.md"
+    cx = repo_root / "src" / "adapter" / "codex_skills" / "plugin-harness" / "SKILL.md"
+    assert cc.is_file(), f"missing: {cc}"
+    assert cx.is_file(), f"missing: {cx}"
 
-    def _body(t):
-        lines = t.splitlines(keepends=True)
-        if not lines or lines[0].strip() != "---":
-            return t
-        for i in range(1, len(lines)):
-            if lines[i].strip() == "---":
-                return "".join(lines[i + 1:])
-        return t
-
-    cc_body = _body(cc.read_text(encoding="utf-8"))
-    cx_body = _body(cx.read_text(encoding="utf-8"))
+    cc_body = extract_body(cc.read_text(encoding="utf-8"))
+    cx_body = extract_body(cx.read_text(encoding="utf-8"))
     assert cc_body == cx_body, (
         f"CC body ({len(cc_body)}) != Codex body ({len(cx_body)})"
     )
