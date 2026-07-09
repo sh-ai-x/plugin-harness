@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://developers.openai.com/codex/plugins/plugin.schema.json",
+  "title": "Codex Plugin Manifest",
+  "description": "Schema for the Codex plugin.json manifest. Source: https://developers.openai.com/codex/plugins. Pinned schema; do not edit lightly.",
+  "type": "object",
+  "required": ["name", "version", "description"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{1,63}$",
+      "description": "kebab-case plugin name, 2-64 chars, lowercase alphanumerics + hyphens, must start with alphanumeric"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-((?:0|[1-9][0-9]*|0[1-9A-Za-z-]*[1-9A-Za-z])(?:\\.(?:0|[1-9][0-9]*|0[1-9A-Za-z-]*[1-9A-Za-z]))*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$",
+      "description": "semver 2.0.0"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "short plugin description (1-200 chars)"
+    },
+    "author": {
+      "type": "object",
+      "properties": {
+        "name": {"type": "string"},
+        "email": {"type": "string", "format": "email"},
+        "url": {"type": "string", "format": "uri"}
+      },
+      "additionalProperties": true
+    },
+    "license": {"type": "string"},
+    "homepage": {"type": "string", "format": "uri"},
+    "skills": {
+      "type": "array",
+      "description": "list of skill directory names under src/skills/",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9-]{1,63}$"
+      },
+      "uniqueItems": true
+    },
+    "mcpServers": {
+      "type": "array",
+      "description": "list of MCP server configurations (referenced from .mcp.json)",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": {"type": "string"},
+          "command": {"type": "string"},
+          "args": {"type": "array", "items": {"type": "string"}},
+          "env": {"type": "object", "additionalProperties": {"type": "string"}}
+        },
+        "additionalProperties": true
+      },
+      "default": []
+    }
+  },
+  "additionalProperties": true
+}
