@@ -26,17 +26,20 @@ Output layout (locked):
 Files to create:
 - `src/emitter/__init__.py`
 - `src/emitter/codex.py` — `emit(state: InterviewState, plan_md: str, output_dir: Path) -> EmitResult`
-- `src/emitter/validator.py` — `validate_emit(output_dir: Path) -> ValidationReport` checks the 4 files exist with required fields
+- `src/emitter/validator.py` — `validate_emit(output_dir: Path) -> ValidationReport` checks the 4 files exist with required fields, runs `jsonschema.validate` against `docs/codex-plugin.schema.json`
 - `src/emitter/templates/codex/plugin.json.j2`
 - `src/emitter/templates/codex/SKILL.md.j2`
 - `src/emitter/templates/codex/mcp.json.j2`
 - `src/emitter/templates/codex/README.md.j2`
 - `tests/test_emitter.py` — pytest: emit produces the 4 files with valid contents; validator catches missing fields
 - `tests/fixtures/sample_state.json`
-- `docs/codex-plugin.schema.json` — vendored copy of the Codex plugin schema (downloaded from https://developers.openai.com/codex/plugins; pinned to a specific version; used by the validator)
+
+Pre-existing files consumed (NOT created by this step):
+- `docs/codex-plugin.schema.json` — vendored copy of the Codex plugin schema. Must be in place before this step runs. Step 3 AC0 verifies the file does NOT contain the literal "Pinned placeholder" marker (the build bootstrap is responsible for replacing any placeholder with the real vendored copy). If AC0 fails, the step reports `status: blocked` with `blocked_reason: docs/codex-plugin.schema.json is still a placeholder; vendor the real schema first`.
 
 Field derivation (locked):
 - `plugin.json.name` → derived from idea plan title (kebab-case)
+- `plugin.json.version` → constant `"0.1.0"` for MVP (bump manually per release). Required by the schema; without it AC4 round-trip fails.
 - `plugin.json.description` → from answer to "what-who-where" (first 200 chars)
 - `SKILL.md` body → from answer to "how-it-works" + the assembled plan
 - `.mcp.json.servers` → empty array (the harness emits no MCP servers in MVP; teams add their own)
@@ -48,14 +51,16 @@ Non-negotiable rules:
 - Re-running `emit` on the same `output_dir` MUST be idempotent (overwrite, no duplicates).
 - Output MUST NOT contain "dev-kit" string anywhere.
 - User-supplied answer text MUST be JSON-escaped before insertion into `plugin.json` (use `json.dumps`, not f-strings) and Markdown/Jinja-escaped before insertion into `SKILL.md` / `README.md` (escape `{`, `}`, `{{`, `}}`, `%`, `#` to prevent Jinja2 SSTI / template injection; escape Markdown as in step 2).
+- The Jinja2 SSTI defense uses **Jinja value-substitution with `|e` filter** in the templates, NOT character-level escaping in the emitter. The emitter passes user text through unchanged; the template `{{ user_text | e }}` (which escapes via Markup) renders safely. This avoids the self-contradicting "escape `{{` AND assert `'{{7*7}}' in skill`" failure mode. AC5 reflects this contract.
 
 ## Acceptance Criteria
 ```bash
+AC0: bash -c '! grep -q "Pinned placeholder" docs/codex-plugin.schema.json' → exit 0 (vendored schema is real, not a placeholder); if fail, step reports `status: blocked`
 AC1: python -m pytest tests/test_emitter.py -v → exit 0 (emit + validate + idempotency + escape-injection + schema-roundtrip)
 AC2: python -c "from src.emitter.codex import emit; from src.emitter.validator import validate_emit; from src.schema.state import InterviewState; import tempfile, pathlib; s=InterviewState(); [s.set_answer(q,'x'*30) for q in ['what-who-where','why-this-problem','how-it-works','ai-usage','how-verified']]; plan='# Idea Plan — test\n\n## 1. What\nx'; d=pathlib.Path(tempfile.mkdtemp()); emit(s, plan, d); r=validate_emit(d); assert r.ok" → exit 0
 AC3: python -c "from src.emitter.validator import validate_emit; import pathlib, tempfile; r=validate_emit(pathlib.Path(tempfile.mkdtemp())); assert not r.ok" → exit 0
-AC4: python -c "import json, jsonschema, pathlib; schema=json.load(open('docs/codex-plugin.schema.json')); emitted=json.load(open('<tmp>/src/.codex-plugin/plugin.json')); jsonschema.validate(emitted, schema)" → exit 0 (round-trip against vendored schema)
-AC5: python -c "from src.emitter.codex import emit; from src.schema.state import InterviewState; import tempfile, pathlib; s=InterviewState(); s.set_answer('how-it-works','{{7*7}}'); [s.set_answer(q,'x'*30) for q in ['what-who-where','why-this-problem','ai-usage','how-verified']]; d=pathlib.Path(tempfile.mkdtemp()); emit(s, '# plan', d); skill=open(d/'src/skills/test/SKILL.md').read(); assert '{{7*7}}' in skill and '49' not in skill" → exit 0 (Jinja SSTI neutralized)
+AC4: python -c "import json, jsonschema, pathlib; schema=json.load(open('docs/codex-plugin.schema.json')); emitted=json.load(open('<tmp>/src/.codex-plugin/plugin.json')); jsonschema.validate(emitted, schema); assert emitted['version'] == '0.1.0'; assert emitted['name']" → exit 0 (round-trip against vendored schema, with version + name)
+AC5: python -c "from src.emitter.codex import emit; from src.schema.state import InterviewState; import tempfile, pathlib; s=InterviewState(); s.set_answer('how-it-works','{{7*7}}'); [s.set_answer(q,'x'*30) for q in ['what-who-where','why-this-problem','ai-usage','how-verified']]; d=pathlib.Path(tempfile.mkdtemp()); emit(s, '# plan', d); skill=open(d/'src/skills/test/SKILL.md').read(); assert '{{7*7}}' in skill and '49' not in skill" → exit 0 (Jinja |e filter escapes at render-time; the raw text is preserved in the source but the rendered output would not execute. To prove defense end-to-end, render the SKILL.md through a Jinja2 Environment with the |e filter and assert the rendered output does NOT contain the literal '49')
 ```
 
 ## Verification & Status Update (REQUIRED before claiming done)
@@ -75,5 +80,5 @@ AC5: python -c "from src.emitter.codex import emit; from src.schema.state import
 - Do not skip any of the 4 output files. 이유: the Codex layout is the product contract.
 - Do not add MCP servers in MVP. 이유: scope — teams add their own; keep the emitter minimal.
 - Do not mention "dev-kit" in any emitted file. 이유: non-goal (b).
-- Do not write outside `src/emitter/`, `tests/test_emitter.py`, `tests/fixtures/sample_state.json`. 이유: path scope.
+- Do not write outside `src/emitter/`, `tests/test_emitter.py`, `tests/fixtures/sample_state.json`, EXCEPT reading `docs/codex-plugin.schema.json` (consumed, not modified) and writing the 4 emitted files inside the caller's `output_dir` (those are the emitter's contract). 이유: path scope clarification.
 - Do not skip TDD. 이유: Iron Law L1.

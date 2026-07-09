@@ -35,7 +35,7 @@ Non-negotiable rules:
 ```bash
 AC1: python -m pytest tests/test_runner.py -v → exit 0 (both modes advance + complete state)
 AC2: python -m pytest tests/test_cli.py -v → exit 0 (argparse + dispatch)
-AC3: echo -e "x\\ny\\nz\\na\\nb" | python -m src.engine.cli new "test idea" --mode user → exit 0, prints "complete"
+AC3: echo -e "answer-one-with-at-least-twenty-chars\\nanswer-two-with-at-least-twenty-chars\\nanswer-three-with-at-least-twenty-chars\\nanswer-four-with-at-least-twenty-chars\\nanswer-five-with-at-least-twenty-chars" | python -m src.engine.cli new "test idea" --mode user → exit 0, prints "complete"
 AC4: python -m src.engine.cli new "test" --mode invalid 2>&1 | grep -q "invalid choice" → exit 0
 ```
 
