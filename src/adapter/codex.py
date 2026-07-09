@@ -83,36 +83,44 @@ def register_codex(project_dir: Path) -> Path:
     Raises
     ------
     FileExistsError
-        If the target or any parent under the install path is a symlink.
-        Hard-fails rather than follow the symlink (PR #26 review A06-3:
-        symlink-following writes are a defense-in-depth gap on shared FS).
+        If the project_dir or any path under the install path is a
+        symlink. Hard-fails rather than follow the symlink so an
+        attacker who pre-plants the project tree as a symlink cannot
+        divert the install. PR #26 round 7 reordered this check to
+        run BEFORE mkdir so partial directory state does not persist
+        on a hostile project_dir.
     """
     target = Path(project_dir) / CODEX_SKILL_REL_PATH
+    # Defense-in-depth: refuse symlinks BEFORE creating any directory.
+    # Otherwise mkdir would materialize attacker-controlled parent
+    # dirs (PR #26 round 7: closes the partial-state gap).
+    _refuse_if_symlink_chain(target, project_root=Path(project_dir))
     target.parent.mkdir(parents=True, exist_ok=True)
-    _refuse_if_symlink_chain(target)  # A06-3
     if target.is_file():
-        _backup_existing(target)  # A06-2 (preserve prior content)
+        _backup_existing(target)  # preserve prior content
     content = _bundled_skill_text()
-    _atomic_write_text(target, content)  # A06-1 + file mode
+    _atomic_write_text(target, content)
     return target
 
 
-def _refuse_if_symlink_chain(target: Path) -> None:
-    """Refuse the install if `target` or any parent UNDER the project is a symlink.
+def _refuse_if_symlink_chain(target: Path, project_root: Path) -> None:
+    """Refuse the install if `target` or any parent UNDER `project_root` is a symlink.
 
-    Defense-in-depth (PR #26 A06-3): an attacker who pre-plants
-    `.agents/skills/plugin-harness/SKILL.md` (or any parent under the
-    install root) as a symlink can otherwise divert the install into
-    an arbitrary host path writable by the installer. Sibling-tempfile +
-    os.replace does not follow symlinks at the rename target on POSIX,
-    so checking the chain here is belt-and-suspenders.
+    Defense-in-depth: an attacker who pre-plants the project tree or
+    any path under the install root as a symlink can otherwise divert
+    the install into an arbitrary host path writable by the installer.
+    Sibling-tempfile + os.replace does not follow symlinks at the
+    rename target on POSIX, so checking the chain here is
+    belt-and-suspenders.
 
-    Only checks paths at or below the project_dir's resolved root.
-    macOS exposes /var -> /private/var, /tmp -> /private/tmp, etc. —
-    those symlinks live above the project root and are not attacker-
-    controlled, so they are out of scope.
+    Walks every ancestor from `target` up to and including
+    `project_root`. macOS exposes /var -> /private/var, /tmp -> /private/tmp,
+    etc. — those symlinks live ABOVE the project root and are not
+    attacker-controlled, so the walk stops at `project_root` rather
+    than walking all the way up to /
+    (PR #26 round 7: previous hardcoded parents[2] silently missed
+    project_dir itself being a symlink).
     """
-    project_root = target.parents[2]  # target = project_dir/.agents/skills/<name>/SKILL.md
     for path in (target, *target.parents):
         if path.is_symlink():
             raise FileExistsError(
@@ -131,7 +139,7 @@ def _backup_existing(target: Path) -> None:
     the idempotent-re-run contract.
     """
     import datetime as _dt
-    ts = _dt.datetime.now().strftime("%Y%m%dT%H%M%S")
+    ts = _dt.datetime.now().strftime("%Y%m%dT%H%M%S%f")
     backup = target.with_suffix(target.suffix + f".bak.{ts}")
     backup.write_text(target.read_text(encoding="utf-8"), encoding="utf-8")
 
