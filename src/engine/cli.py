@@ -25,7 +25,10 @@ from src.engine.runner import (
 from src.schema.state import InterviewState
 
 
-VALID_MODES = ("user", "ai-research")
+# PR #22 round 8 (major #3): mode list lifted into
+# src/engine/modes/__init__.py as the single source of truth. Import
+# MODES there and use it for argparse choices and validation.
+from src.engine.modes import MODES as VALID_MODES
 
 
 def build_parser() -> argparse.ArgumentParser:

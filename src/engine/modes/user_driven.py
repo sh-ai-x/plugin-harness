@@ -9,7 +9,7 @@ from __future__ import annotations
 import sys
 from typing import Callable, Optional
 
-from src.engine.runner import UserAbortError
+from src.engine.errors import UserAbortError
 
 
 def default_stdin_reader(prompt: str) -> str:

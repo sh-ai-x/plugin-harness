@@ -7,7 +7,9 @@ web_fetch to gather material before drafting. This module itself performs no I/O
 """
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Optional
+
+from src.engine.runner import ToolSurface
 
 
 class DefaultToolSurface:
@@ -29,7 +31,14 @@ class DefaultToolSurface:
         return template
 
 
-def make_tool_surface(surface: Optional[Any]) -> Any:
+def make_tool_surface(surface: Optional[ToolSurface]) -> ToolSurface:
+    """Return the supplied tool surface, or the in-process DefaultToolSurface.
+
+    PR #22 round 8 (🟠 major #2): both arg and return were `Any`,
+    defeating the ToolSurface Protocol from runner.py. Now both are
+    typed `Optional[ToolSurface]` / `ToolSurface` so the Protocol
+    contract actually flows through the factory boundary.
+    """
     if surface is None:
         return DefaultToolSurface()
     return surface
