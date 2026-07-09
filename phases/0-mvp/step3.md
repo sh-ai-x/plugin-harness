@@ -42,7 +42,7 @@ Field derivation (locked):
 - `plugin.json.version` → constant `"0.1.0"` for MVP (bump manually per release). Required by the schema; without it AC4 round-trip fails.
 - `plugin.json.description` → from answer to "what-who-where" (first 200 chars)
 - `SKILL.md` body → from answer to "how-it-works" + the assembled plan
-- `.mcp.json.servers` → empty array (the harness emits no MCP servers in MVP; teams add their own)
+- `.mcp.json.mcpServers` → empty array (the harness emits no MCP servers in MVP; teams add their own). Field name MUST be `mcpServers` (camelCase) to match the Codex schema and MCP spec; `servers` is non-standard and silently ignored at load time.
 - `README.md` → assembled plan verbatim
 
 Non-negotiable rules:
@@ -50,8 +50,8 @@ Non-negotiable rules:
 - `plugin.json` MUST validate against the vendored `docs/codex-plugin.schema.json` (NOT against the live URL — that may change). The validator loads the vendored schema and runs `jsonschema.validate`. Validator MUST reject bad shapes with a typed error.
 - Re-running `emit` on the same `output_dir` MUST be idempotent (overwrite, no duplicates).
 - Output MUST NOT contain "dev-kit" string anywhere.
-- User-supplied answer text MUST be JSON-escaped before insertion into `plugin.json` (use `json.dumps`, not f-strings) and Markdown/Jinja-escaped before insertion into `SKILL.md` / `README.md` (escape `{`, `}`, `{{`, `}}`, `%`, `#` to prevent Jinja2 SSTI / template injection; escape Markdown as in step 2).
-- The Jinja2 SSTI defense uses **Jinja value-substitution with `|e` filter** in the templates, NOT character-level escaping in the emitter. The emitter passes user text through unchanged; the template `{{ user_text | e }}` (which escapes via Markup) renders safely. This avoids the self-contradicting "escape `{{` AND assert `'{{7*7}}' in skill`" failure mode. AC5 reflects this contract.
+- User-supplied answer text MUST be JSON-escaped before insertion into `plugin.json` (use `json.dumps`, not f-strings) and Markdown-escaped before insertion into `SKILL.md` / `README.md` (escape as in step 2: `[`, `]`, `<`, `>`, `` ` ``, `#`, `*`, `_`, leading `>`).
+- The Jinja2 SSTI defense uses **Jinja value-substitution with `|e` filter** in the templates ONLY. The emitter does NOT perform character-level escaping of `{`, `}`, `{{`, `}}`, `%`, `#`. User text passes through unchanged; the template `{{ user_text | e }}` (which escapes via Markup) renders safely. AC5 verifies end-to-end render-through.
 
 ## Acceptance Criteria
 ```bash
@@ -59,8 +59,8 @@ AC0: bash -c '! grep -q "Pinned placeholder" docs/codex-plugin.schema.json' → 
 AC1: python -m pytest tests/test_emitter.py -v → exit 0 (emit + validate + idempotency + escape-injection + schema-roundtrip)
 AC2: python -c "from src.emitter.codex import emit; from src.emitter.validator import validate_emit; from src.schema.state import InterviewState; import tempfile, pathlib; s=InterviewState(); [s.set_answer(q,'x'*30) for q in ['what-who-where','why-this-problem','how-it-works','ai-usage','how-verified']]; plan='# Idea Plan — test\n\n## 1. What\nx'; d=pathlib.Path(tempfile.mkdtemp()); emit(s, plan, d); r=validate_emit(d); assert r.ok" → exit 0
 AC3: python -c "from src.emitter.validator import validate_emit; import pathlib, tempfile; r=validate_emit(pathlib.Path(tempfile.mkdtemp())); assert not r.ok" → exit 0
-AC4: python -c "import json, jsonschema, pathlib; schema=json.load(open('docs/codex-plugin.schema.json')); emitted=json.load(open('<tmp>/src/.codex-plugin/plugin.json')); jsonschema.validate(emitted, schema); assert emitted['version'] == '0.1.0'; assert emitted['name']" → exit 0 (round-trip against vendored schema, with version + name)
-AC5: python -c "from src.emitter.codex import emit; from src.schema.state import InterviewState; import tempfile, pathlib; s=InterviewState(); s.set_answer('how-it-works','{{7*7}}'); [s.set_answer(q,'x'*30) for q in ['what-who-where','why-this-problem','ai-usage','how-verified']]; d=pathlib.Path(tempfile.mkdtemp()); emit(s, '# plan', d); skill=open(d/'src/skills/test/SKILL.md').read(); assert '{{7*7}}' in skill and '49' not in skill" → exit 0 (Jinja |e filter escapes at render-time; the raw text is preserved in the source but the rendered output would not execute. To prove defense end-to-end, render the SKILL.md through a Jinja2 Environment with the |e filter and assert the rendered output does NOT contain the literal '49')
+AC4: python -c "import json, jsonschema, pathlib, tempfile; from src.emitter.codex import emit; from src.schema.state import InterviewState; d=pathlib.Path(tempfile.mkdtemp()); s=InterviewState(); [s.set_answer(q,'x'*30) for q in ['what-who-where','why-this-problem','how-it-works','ai-usage','how-verified']]; emit(s, '# Idea Plan — test\n\n## 1. What\nx', d); schema=json.load(open('docs/codex-plugin.schema.json')); emitted=json.load(open(d/'src/.codex-plugin/plugin.json')); jsonschema.validate(emitted, schema); assert emitted['version'] == '0.1.0'; assert emitted['name']; mcp=json.load(open(d/'src/.mcp.json')); assert mcp.get('mcpServers') == []" → exit 0 (round-trip against vendored schema, with version + name + mcpServers key)
+AC5: python -c "from jinja2 import Environment; env=Environment(autoescape=True); tpl=env.from_string(open('src/emitter/templates/codex/SKILL.md.j2').read()); rendered=tpl.render(how_it_works='{{7*7}}', plan='# plan'); assert '49' not in rendered and '{{7*7}}' not in rendered" → exit 0 (end-to-end SSTI defense: template uses `{{ how_it_works | e }}` (autoescape on); the literal `{{7*7}}` user input is rendered as the escaped text `{{7*7}}` and Jinja does NOT evaluate it; `49` (the result of `7*7`) never appears in the rendered output)
 ```
 
 ## Verification & Status Update (REQUIRED before claiming done)

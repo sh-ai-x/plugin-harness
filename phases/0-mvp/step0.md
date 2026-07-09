@@ -11,7 +11,7 @@
 Define the 5 fixed interview questions as a structured schema and a serializable interview state. The schema is the product surface; the state is the runtime carrier.
 
 Files to create:
-- `src/schema/questions.json` — the 5-question schema (id, prompt, answer_type, choices, min_length, validation hint)
+- `src/schema/questions.py` — Python module that exposes `QUESTIONS: list[dict]` (the 5-question schema: id, prompt, answer_type, choices, min_length, validation hint). NOTE: must be `.py` so AC3's `from src.schema.questions import QUESTIONS` works; a `.json` file would ModuleNotFoundError on import.
 - `src/schema/state.py` — `InterviewState` class with `advance()`, `set_answer(qid, value)`, `is_complete()`, `current_question()`, `to_dict()`, `from_dict()`, `validate_answer(qid, value)`
 - `src/schema/__init__.py` — re-exports `QUESTIONS`, `InterviewState`
 - `tests/test_question_schema.py` — pytest: schema loads, all 5 questions present, fields complete
