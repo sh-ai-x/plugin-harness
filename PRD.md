@@ -1,6 +1,6 @@
 # PRD — plugin-harness
 
-> Plan stage output. Methodology: tdd. Worktree: `.claude/worktrees/plan-v2`. Branch: `plan/plugin-harness-v2`. Date: 2026-07-08.
+> Plan stage output. Methodology: tdd. Worktree: `.claude/worktrees/plan-v3`. Branch: `plan/plugin-harness-v3`. Date: 2026-07-08.
 
 ## §1 Frame
 
@@ -46,7 +46,7 @@ Source of truth: `phases/0-mvp/index.json`.
 
 ## §5 Acceptance Criteria
 
-The AC list maps 1:1 to per-step AC commands in `phases/0-mvp/step<N>.md`. The build runner reads both files; mismatch fails the build.
+Representative subset of per-step AC commands from `phases/0-mvp/step<N>.md`. Each step file owns its own full AC inventory (29 ACs across 7 steps). The build runner reads both PRD §5 (representative subset) and the per-step files (full inventory); mismatch on any row listed here fails the build. Steps 1, 2, 4, 5 also have full per-step ACs that are NOT mirrored in this table; see their step files for the full contract.
 
 | AC# | Step | Command | Source |
 |---|---|---|---|
@@ -54,7 +54,7 @@ The AC list maps 1:1 to per-step AC commands in `phases/0-mvp/step<N>.md`. The b
 | AC2 | step 0 | `python -m pytest tests/test_interview_state.py -v → exit 0` | `phases/0-mvp/step0.md` AC2 |
 | AC3 | step 3 | `python -m pytest tests/test_emitter.py -v → exit 0` | `phases/0-mvp/step3.md` AC1 |
 | AC4 | step 6 | `bash scripts/e2e.sh → exit 0` | `phases/0-mvp/step6.md` AC1 |
-| AC5 | step 6 | `grep -r "dev-kit" src/ scripts/ tests/ → exit 1` (no matches — non-goal b) | `phases/0-mvp/step6.md` AC5 |
+| AC5 | step 6 | `grep -r "dev-kit" src/ scripts/ tests/ → exit 1` (no matches — non-goal b; post-emit output_dir now also covered per step 6 AC5) | `phases/0-mvp/step6.md` AC5 |
 
 ## §6 Hand-off
 
