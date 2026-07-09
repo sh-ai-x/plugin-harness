@@ -25,4 +25,17 @@ if ! python3 -c "import pytest" 2>/dev/null; then
   python3 -m pip install --quiet "pytest>=8.0,<9.0"
 fi
 
+# step 2 (idea-plan-assembler) requires jinja2. Install with a version pin
+# to match the security review's A03 finding (undeclared runtime dep).
+if ! python3 -c "import jinja2" 2>/dev/null; then
+  echo "test.sh: installing jinja2 (pinned)..."
+  python3 -m pip install --quiet "jinja2>=3.1,<4"
+fi
+# step 3 (dual-runtime-emitter) requires jsonschema for vendored schema
+# validation. Same A03 finding pattern as jinja2 above.
+if ! python3 -c "import jsonschema" 2>/dev/null; then
+  echo "test.sh: installing jsonschema (pinned)..."
+  python3 -m pip install --quiet "jsonschema>=4.18,<5"
+fi
+
 python3 -m pytest tests/ -v --tb=short
