@@ -3,7 +3,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from .questions import QUESTIONS, canonical_ids, get_question
+from .questions import DEFAULT_MAX_LENGTH, QUESTIONS, canonical_ids, get_question
+
+# PR #21 review (security round 3): total-payload cap across all
+# answers, on top of the per-question max_length. Default 5 * 2000
+# = 10_000 chars — well within 'multi-paragraph idea' territory,
+# tight enough to bound the memory-exhaustion DoS surface that
+# unbounded input on a documented user-input trust boundary exposed.
+MAX_TOTAL_PAYLOAD = DEFAULT_MAX_LENGTH * len(QUESTIONS)
 
 
 class SchemaError(Exception):
@@ -50,10 +57,36 @@ class InterviewState:
         return self._cursor >= len(QUESTIONS) and len(self.answers) == len(QUESTIONS)
 
     def advance(self) -> None:
-        if self._cursor < len(QUESTIONS):
-            self._cursor += 1
+        # PR #21 review (security round 3, major): advance() now refuses
+        # to move the cursor when the current question has no answer.
+        # The previous silent increment let a caller reach
+        # is_complete()==True while skipping earlier canonical questions.
+        if self._cursor >= len(QUESTIONS):
+            return  # idempotent at end-of-interview
+        expected = canonical_ids()[self._cursor]
+        if expected not in self.answers:
+            raise SchemaError(
+                f"cannot advance: question {expected!r} (cursor={self._cursor}) "
+                f"has no answer"
+            )
+        self._cursor += 1
 
     def set_answer(self, qid: str, value: Any) -> None:
+        # PR #21 review (security round 3, major): caller can no longer
+        # record an out-of-order answer. The qid MUST match the current
+        # cursor's canonical question; otherwise a caller could answer
+        # Q4 first and reach is_complete() while skipping Q0-Q3.
+        ids = canonical_ids()
+        if self._cursor >= len(ids):
+            raise SchemaError(
+                f"cannot set_answer: interview already complete (cursor={self._cursor})"
+            )
+        expected = ids[self._cursor]
+        if qid != expected:
+            raise SchemaError(
+                f"set_answer out of order: expected {expected!r} at cursor "
+                f"{self._cursor}, got {qid!r}"
+            )
         question = self._lookup_question(qid)  # raises SchemaError on unknown id
         if not self.validate_answer(qid, value):
             n = len(value) if isinstance(value, str) else 0
@@ -73,6 +106,8 @@ class InterviewState:
         # trust boundary. min_length and max_length are read from the
         # question dict; both are required for a valid answer.
         return question["min_length"] <= n <= question.get("max_length", float("inf"))
+
+    # ---- (de)serialization) ----
 
     # ---- (de)serialization ----
 
@@ -98,30 +133,74 @@ class InterviewState:
                 f"payload contains unknown question ids: {sorted(unknown)!r}"
             )
         state = cls()
-        # Validate every answer; raises ValidationError on bad data.
+        # PR #21 review (security round 3, major + A10 partial-state bug):
+        # Build a LOCAL dict during validation, then assign to state.answers
+        # atomically. A mid-loop ValidationError now raises with state.answers
+        # untouched. Also enforce a total-payload cap (sum of answer
+        # lengths) to bound the memory-exhaustion DoS surface that the
+        # per-question max_length cap alone did not close.
+        built: dict[str, str] = {}
+        total_len = 0
         for qid, value in raw_answers.items():
-            if not state.validate_answer(qid, value):
+            if not isinstance(value, str):
+                raise ValidationError(
+                    f"payload answer for {qid!r}: must be str, "
+                    f"got {type(value).__name__}"
+                )
+            if not get_question(qid):  # pragma: no cover (already filtered above)
+                raise SchemaError(f"unknown question id: {qid!r}")
+            if not _validate_value_against_question(qid, value):
                 raise ValidationError(
                     f"payload answer for {qid!r} fails validation"
                 )
-            state.answers[qid] = value
-        # Honor caller-supplied cursor when it's a non-negative int.
-        # Note: `type(cursor) is int` (NOT isinstance) because in Python `bool`
-        # is a subclass of `int`; isinstance(True, int) is True. A payload like
-        # {"cursor": true} would otherwise silently set _cursor = 1 and skip
-        # question 0. See regression test_rejects_bool_cursor in test_interview_state.py.
+            total_len += len(value)
+            if total_len > MAX_TOTAL_PAYLOAD:
+                raise ValidationError(
+                    f"payload exceeds MAX_TOTAL_PAYLOAD={MAX_TOTAL_PAYLOAD} chars"
+                )
+            built[qid] = value
+        # Cursor clamp: tie to max_answered_idx so a caller-supplied
+        # cursor that desyncs from the answered set is rejected (A06-3).
+        max_answered_idx = -1
+        for qid in built.keys():
+            idx = ids.index(qid)
+            if idx > max_answered_idx:
+                max_answered_idx = idx
         cursor = payload.get("cursor")
         if type(cursor) is int and not isinstance(cursor, bool) and cursor >= 0:
-            state._cursor = min(cursor, len(QUESTIONS))
+            # Caller cursor must not exceed the highest answered index + 1;
+            # otherwise the state is unreachable-by-construction.
+            state_cursor = min(cursor, max_answered_idx + 1, len(QUESTIONS))
+            state._cursor = state_cursor
         else:
-            # PR #21 review: previous derivation jumped to max(answered)+1
-            # and stranded earlier canonical questions if answers arrived
-            # out of order (e.g. Q4 answered before Q0). Walk canonical_ids()
-            # to the first unanswered question so re-runs prompt for the
-            # right next question.
+            # No caller cursor: walk canonical_ids() to the first
+            # unanswered question. PR #21 round-2 fix; preserves the
+            # round-trip semantics where a re-loaded state prompts for
+            # the right next question even when answers arrived in a
+            # non-canonical order.
             state._cursor = 0
             for qid in canonical_ids():
-                if qid not in state.answers:
+                if qid not in built:
                     break
                 state._cursor += 1
+        # Only assign the built dict after the cursor is settled, so any
+        # exception path leaves state in its post-construction state.
+        state.answers = built
         return state
+
+def _validate_value_against_question(qid: str, value: Any) -> bool:
+    """Standalone validator used by from_dict to avoid mutating state.
+
+    Mirrors InterviewState.validate_answer without requiring a state
+    instance, so the from_dict build loop can stage answers in a local
+    dict and assign to state.answers atomically only after the full
+    loop succeeds (PR #21 security round 3, A10 atomicity).
+    """
+    try:
+        q = get_question(qid)
+    except KeyError:
+        return False
+    if not isinstance(value, str):
+        return False
+    n = len(value)
+    return q["min_length"] <= n <= q.get("max_length", float("inf"))

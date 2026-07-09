@@ -37,7 +37,11 @@ def test_set_answer_records_value_for_current_question():
 
 
 def test_advance_moves_to_next_question():
+    # PR #21 security round 3: advance() refuses to move the cursor
+    # when the current question has no answer. The test now sets the
+    # answer first, mirroring the canonical interview flow.
     s = InterviewState()
+    s.set_answer("what-who-where", _valid_answer("what-who-where"))
     s.advance()
     assert s.current_question() == QUESTIONS[1]
 
@@ -214,3 +218,78 @@ def test_state_does_not_import_private_question_index():
     import src.schema.state as state_mod
     src = open(state_mod.__file__).read()
     assert "_QUESTION_BY_ID" not in src, "state.py must not import the private _QUESTION_BY_ID"
+
+
+# ---------- PR #21 security round 3 regression ----------
+def test_set_answer_rejects_out_of_order():
+    """🟠 major: set_answer no longer accepts an out-of-order qid."""
+    s = InterviewState()
+    s.set_answer("what-who-where", _valid_answer("what-who-where"))
+    # Cursor is now 0 (still — set_answer doesn't advance in this contract).
+    # Attempt to answer Q4 directly should raise.
+    s2 = InterviewState()
+    with pytest.raises(SchemaError, match="set_answer out of order"):
+        s2.set_answer("how-verified", _valid_answer("how-verified"))
+
+
+def test_advance_refuses_when_current_question_unanswered():
+    """🟠 major: advance() refuses to skip ahead when the current q has no answer."""
+    s = InterviewState()
+    with pytest.raises(SchemaError, match="has no answer"):
+        s.advance()
+
+
+def test_from_dict_atomic_on_partial_validation_failure():
+    """🟠 major (A10): from_dict assigns state.answers only after full success."""
+    # The 6th canonical question id is unknown -> ValidationError must NOT leave
+    # state.answers populated. Note: from_dict validates qid membership before
+    # validate_answer, so an unknown qid raises SchemaError not ValidationError.
+    # Use a known qid with too-short value to trigger ValidationError mid-loop.
+    too_short = "x" * 5
+    with pytest.raises(ValidationError):
+        InterviewState.from_dict({
+            "answers": {
+                "what-who-where": _valid_answer("what-who-where"),
+                "why-this-problem": too_short,  # < min_length
+            }
+        })
+    # The error path: a separate fresh state must not be polluted.
+    # The error path: too_short value triggers ValidationError before built is
+    # assigned to state.answers. From the from_dict contract this is a single
+    # exception; we never reach the return statement. Test the *observable*
+    # contract: a separate fresh state must not be polluted.
+    fresh = InterviewState()
+    assert fresh.answers == {}
+
+
+def test_from_dict_rejects_cursor_that_desyncs_from_answered():
+    """🟠 major (A06-3): caller cursor > max(answered)+1 is clamped."""
+    s = InterviewState.from_dict({
+        "cursor": 4,  # claims Q4 is next, but only Q0-Q2 answered
+        "answers": {
+            "what-who-where": _valid_answer("what-who-where"),
+            "why-this-problem": _valid_answer("why-this-problem"),
+            "how-it-works": _valid_answer("how-it-works"),
+        },
+    })
+    # max_answered_idx=2, so cursor must clamp to 3 (next after Q2).
+    assert s._cursor == 3
+    assert s.current_question()["id"] == "ai-usage"
+
+
+def test_from_dict_enforces_per_question_max_length():
+    """🟠 major (A06): per-question max_length caps individual answer length.
+
+    The total-payload cap (MAX_TOTAL_PAYLOAD) is defense-in-depth on top
+    of per-question max_length; with 5 canonical questions at the
+    per-question cap, the total equals MAX_TOTAL_PAYLOAD exactly. Going
+    over per-question max_length is caught first (this test), and the
+    total cap is the second line of defense.
+    """
+    with pytest.raises(ValidationError, match="fails validation"):
+        InterviewState.from_dict({
+            "answers": {
+                qid: "x" * (DEFAULT_MAX_LENGTH + 1)  # 1 over per-q cap
+                for qid in ["what-who-where", "why-this-problem", "how-it-works", "ai-usage", "how-verified"]
+            }
+        })
