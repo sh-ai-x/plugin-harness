@@ -11,11 +11,11 @@
     "ambiguity_score_threshold": 3
   },
   "cycles": [
-    {"n": 1, "evidence_count": 3, "value_score": 3.33, "ambiguity_score_before": 10, "ambiguity_score_after": 8, "narrowed_delta": -2, "knob": "scope", "question": "smallest 2-week version and the one number that moves?", "answer_source": "user-delegated", "answer_summary": "5-question CLI + assembler + emitter; time-to-first-team-plugin <= 30 min", "dedup_metric": null, "status": "narrowed"},
-    {"n": 2, "evidence_count": 3, "value_score": 3.33, "ambiguity_score_before": 8, "ambiguity_score_after": 5, "narrowed_delta": -3, "knob": "kill", "question": "what would make you kill it after launch?", "answer_source": "model-inferred", "answer_summary": "non-developer cannot complete interview + ship plugin under 30 min unaided", "dedup_metric": null, "status": "narrowed"},
-    {"n": 3, "evidence_count": 3, "value_score": 3.33, "ambiguity_score_before": 5, "ambiguity_score_after": 3, "narrowed_delta": -2, "knob": "user", "question": "second persona for canary cohort?", "answer_source": "user-stated-implicit", "answer_summary": "PM at 3-person growth team, non-coder; same archetype as marketing manager", "dedup_metric": null, "status": "narrowed"}
+    {"n": 1, "evidence_count": 3, "value_score": 33.33, "ambiguity_score_before": 10, "ambiguity_score_after": 8, "narrowed_delta": -2, "knob": "scope", "question": "smallest 2-week version and the one number that moves?", "answer_source": "user-delegated", "answer_summary": "5-question CLI + assembler + emitter; time-to-first-team-plugin <= 30 min", "dedup_metric": null, "status": "narrowed"},
+    {"n": 2, "evidence_count": 3, "value_score": 33.33, "ambiguity_score_before": 8, "ambiguity_score_after": 5, "narrowed_delta": -3, "knob": "kill", "question": "what would make you kill it after launch?", "answer_source": "model-inferred", "answer_summary": "non-developer cannot complete interview + ship plugin under 30 min unaided", "dedup_metric": null, "status": "narrowed"},
+    {"n": 3, "evidence_count": 3, "value_score": 33.33, "ambiguity_score_before": 5, "ambiguity_score_after": 3, "narrowed_delta": -2, "knob": "user", "question": "second persona for canary cohort?", "answer_source": "user-stated-implicit", "answer_summary": "PM at 3-person growth team, non-coder; same archetype as marketing manager", "dedup_metric": null, "status": "narrowed"}
   ],
-  "final": {"ambiguity_score": 3, "value_score": 3.33, "evidence_count": 3, "convergence_test": "PASS"},
+  "final": {"ambiguity_score": 3, "value_score": 33.33, "evidence_count": 3, "convergence_test": "PASS"},
   "narrowing": [10, 8, 5, 3],
   "status": "emitted"
 }

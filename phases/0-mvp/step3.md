@@ -33,6 +33,7 @@ Files to create:
 - `src/emitter/templates/codex/README.md.j2`
 - `tests/test_emitter.py` — pytest: emit produces the 4 files with valid contents; validator catches missing fields
 - `tests/fixtures/sample_state.json`
+- `docs/codex-plugin.schema.json` — vendored copy of the Codex plugin schema (downloaded from https://developers.openai.com/codex/plugins; pinned to a specific version; used by the validator)
 
 Field derivation (locked):
 - `plugin.json.name` → derived from idea plan title (kebab-case)
@@ -43,15 +44,18 @@ Field derivation (locked):
 
 Non-negotiable rules:
 - All 4 output files MUST be created; missing file → `EmitError`.
-- `plugin.json` MUST validate against the Codex schema (https://developers.openai.com/codex/plugins); the validator MUST reject bad shapes.
+- `plugin.json` MUST validate against the vendored `docs/codex-plugin.schema.json` (NOT against the live URL — that may change). The validator loads the vendored schema and runs `jsonschema.validate`. Validator MUST reject bad shapes with a typed error.
 - Re-running `emit` on the same `output_dir` MUST be idempotent (overwrite, no duplicates).
 - Output MUST NOT contain "dev-kit" string anywhere.
+- User-supplied answer text MUST be JSON-escaped before insertion into `plugin.json` (use `json.dumps`, not f-strings) and Markdown/Jinja-escaped before insertion into `SKILL.md` / `README.md` (escape `{`, `}`, `{{`, `}}`, `%`, `#` to prevent Jinja2 SSTI / template injection; escape Markdown as in step 2).
 
 ## Acceptance Criteria
 ```bash
-AC1: python -m pytest tests/test_emitter.py -v → exit 0 (emit + validate + idempotency)
+AC1: python -m pytest tests/test_emitter.py -v → exit 0 (emit + validate + idempotency + escape-injection + schema-roundtrip)
 AC2: python -c "from src.emitter.codex import emit; from src.emitter.validator import validate_emit; from src.schema.state import InterviewState; import tempfile, pathlib; s=InterviewState(); [s.set_answer(q,'x'*30) for q in ['what-who-where','why-this-problem','how-it-works','ai-usage','how-verified']]; plan='# Idea Plan — test\n\n## 1. What\nx'; d=pathlib.Path(tempfile.mkdtemp()); emit(s, plan, d); r=validate_emit(d); assert r.ok" → exit 0
 AC3: python -c "from src.emitter.validator import validate_emit; import pathlib, tempfile; r=validate_emit(pathlib.Path(tempfile.mkdtemp())); assert not r.ok" → exit 0
+AC4: python -c "import json, jsonschema, pathlib; schema=json.load(open('docs/codex-plugin.schema.json')); emitted=json.load(open('<tmp>/src/.codex-plugin/plugin.json')); jsonschema.validate(emitted, schema)" → exit 0 (round-trip against vendored schema)
+AC5: python -c "from src.emitter.codex import emit; from src.schema.state import InterviewState; import tempfile, pathlib; s=InterviewState(); s.set_answer('how-it-works','{{7*7}}'); [s.set_answer(q,'x'*30) for q in ['what-who-where','why-this-problem','ai-usage','how-verified']]; d=pathlib.Path(tempfile.mkdtemp()); emit(s, '# plan', d); skill=open(d/'src/skills/test/SKILL.md').read(); assert '{{7*7}}' in skill and '49' not in skill" → exit 0 (Jinja SSTI neutralized)
 ```
 
 ## Verification & Status Update (REQUIRED before claiming done)

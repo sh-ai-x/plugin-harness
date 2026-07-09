@@ -33,7 +33,7 @@ Non-negotiable rules:
 ```bash
 AC1: python -m pytest tests/test_cc_adapter.py -v → exit 0 (file creation + idempotency + content sanity)
 AC2: python -c "from src.adapter.cc import register_cc; import pathlib, tempfile; d=pathlib.Path(tempfile.mkdtemp()); register_cc(d); assert (d/'.claude/commands/plugin-harness.md').exists(); assert (d/'.claude/skills/plugin-harness/SKILL.md').exists()" → exit 0
-AC3: grep -q "dev-kit" $(find /Users/sanghee/dev/plugin-harness/.claude/worktrees/plan-v2/src/adapter -type f) 2>/dev/null && exit 1 || exit 0
+AC3: bash -c '! grep -rq "dev-kit" src/adapter/ 2>/dev/null' → exit 0 (no dev-kit token in adapter source)
 ```
 
 ## Verification & Status Update (REQUIRED before claiming done)
@@ -52,5 +52,5 @@ AC3: grep -q "dev-kit" $(find /Users/sanghee/dev/plugin-harness/.claude/worktree
 ## Don't
 - Do not modify the engine CLI in this step. 이유: step 1 owns the engine; this step only adapts the surface.
 - Do not mention "dev-kit" in any emitted file. 이유: non-goal (b).
-- Do not write outside `src/adapter/`, `tests/test_cc_adapter.py`, `tests/fixtures/cc_install/`. 이유: path scope.
+- Do not write outside `src/adapter/`, `tests/test_cc_adapter.py`, `tests/fixtures/cc_install/`, EXCEPT the adapter install paths under `.claude/commands/` and `.claude/skills/` inside the target `project_dir` passed to `register_cc`. Those writes are the adapter's contract — they are NOT inside the plugin's own source tree. 이유: path scope clarification.
 - Do not skip TDD. 이유: Iron Law L1.
