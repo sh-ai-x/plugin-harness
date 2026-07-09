@@ -8,6 +8,12 @@ from __future__ import annotations
 from typing import Any
 
 
+# PR #21 review: per-question max_length cap. Default 2000 chars; long
+# enough to express a multi-paragraph idea, short enough to bound the
+# memory-exhaustion DoS surface that an unbounded answer value exposed
+# on the documented user-input trust boundary.
+DEFAULT_MAX_LENGTH = 2000
+
 QUESTIONS: list[dict[str, Any]] = [
     {
         "id": "what-who-where",
@@ -15,6 +21,7 @@ QUESTIONS: list[dict[str, Any]] = [
         "answer_type": "text",
         "choices": [],
         "min_length": 20,
+        "max_length": DEFAULT_MAX_LENGTH,
         "validation_hint": "20자 이상의 한국어/영문 설명 (대상 사용자, 사용 맥락 포함)",
     },
     {
@@ -23,6 +30,7 @@ QUESTIONS: list[dict[str, Any]] = [
         "answer_type": "text",
         "choices": [],
         "min_length": 20,
+        "max_length": DEFAULT_MAX_LENGTH,
         "validation_hint": "20자 이상 — 해결하려는 문제의 동기와 임팩트",
     },
     {
@@ -31,6 +39,7 @@ QUESTIONS: list[dict[str, Any]] = [
         "answer_type": "text",
         "choices": [],
         "min_length": 20,
+        "max_length": DEFAULT_MAX_LENGTH,
         "validation_hint": "20자 이상 — 입력/처리/출력 흐름을 한 단락으로",
     },
     {
@@ -39,6 +48,7 @@ QUESTIONS: list[dict[str, Any]] = [
         "answer_type": "text",
         "choices": [],
         "min_length": 20,
+        "max_length": DEFAULT_MAX_LENGTH,
         "validation_hint": "20자 이상 — 어떤 AI 호출이 어느 단계에서 사용되는지",
     },
     {
@@ -47,6 +57,7 @@ QUESTIONS: list[dict[str, Any]] = [
         "answer_type": "text",
         "choices": [],
         "min_length": 20,
+        "max_length": DEFAULT_MAX_LENGTH,
         "validation_hint": "20자 이상 — 테스트/시나리오/수동 검증 방법",
     },
 ]

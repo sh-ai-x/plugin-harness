@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.schema.questions import QUESTIONS
+from src.schema.questions import QUESTIONS, DEFAULT_MAX_LENGTH
 from src.schema.state import InterviewState, SchemaError, ValidationError
 
 
@@ -168,3 +168,49 @@ def test_from_dict_rejects_undersized_value_in_payload():
     d["answers"]["why-this-problem"] = "x"  # 1 char, min is 20
     with pytest.raises(ValidationError):
         InterviewState.from_dict(d)
+
+
+# ---------- PR #21 review regression: max_length cap + cursor-fallback walk ----------
+def test_set_answer_rejects_too_long_value():
+    """PR #21 review (🟠 major): max_length caps answer length to bound the
+    memory-exhaustion DoS surface on the documented user-input trust boundary.
+    """
+    s = InterviewState()
+    too_long = "x" * (DEFAULT_MAX_LENGTH + 1)
+    with pytest.raises(ValidationError):
+        s.set_answer("what-who-where", too_long)
+
+
+def test_set_answer_accepts_value_at_max_length():
+    """Boundary case: value of exactly max_length chars is accepted."""
+    s = InterviewState()
+    at_max = "x" * DEFAULT_MAX_LENGTH
+    s.set_answer("what-who-where", at_max)
+    assert s.answers["what-who-where"] == at_max
+
+
+def test_from_dict_cursor_walks_canonical_on_out_of_order_answers():
+    """PR #21 review (🟡 minor): previous cursor fallback jumped to
+    max(answered)+1 and stranded earlier canonical questions when answers
+    arrived out of order (e.g. Q4 answered before Q0). Now walks
+    canonical_ids() to the first unanswered question.
+    """
+    s = InterviewState.from_dict({
+        "answers": {
+            "how-verified": "x" * 30,  # idx 4
+            "what-who-where": "y" * 30,  # idx 0
+            # Q1, Q2, Q3 unanswered
+        }
+    })
+    # The first unanswered canonical question is idx 1 (why-this-problem).
+    assert s.current_question()["id"] == "why-this-problem"
+
+
+def test_state_does_not_import_private_question_index():
+    """PR #21 review (🟠 major leaky abstraction): state.py previously
+    imported the private _QUESTION_BY_ID. Now uses only the public
+    get_question() / canonical_ids() API.
+    """
+    import src.schema.state as state_mod
+    src = open(state_mod.__file__).read()
+    assert "_QUESTION_BY_ID" not in src, "state.py must not import the private _QUESTION_BY_ID"
