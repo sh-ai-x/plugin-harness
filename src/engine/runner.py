@@ -26,16 +26,10 @@ StdinReader = Callable[[str], str]
 StdoutWriter = Callable[[str], None]
 
 
-class InterviewIncompleteError(RuntimeError):
-    """Raised when the interview ends before all 5 answers were recorded.
-
-    Covers: empty input, validation failure (too short), tool-surface failure
-    on a non-final question, or any other interruption that left state partial.
-    """
-
-
-class UserAbortError(RuntimeError):
-    """Raised when the user closed stdin / hit Ctrl-D / hit Ctrl-C."""
+# PR #22 round 8: UserAbortError and InterviewIncompleteError moved
+# to src/engine/errors.py. Re-exported here for backward compatibility
+# with cli.py and modes/*. The canonical home is src.engine.errors.
+from src.engine.errors import InterviewIncompleteError, UserAbortError  # noqa: F401
 
 
 def run_interview(
@@ -58,7 +52,10 @@ def run_interview(
         - UserAbortError when mode="user" and stdin closes early (propagated from the reader).
         - InterviewIncompleteError when an answer is missing/invalid before completion.
     """
-    if mode not in ("user", "ai-research"):
+    # PR #22 round 8 (major #3): mode list lifted into
+    # src/engine/modes/__init__.py as the single source of truth.
+    from src.engine.modes import MODES
+    if mode not in MODES:
         raise ValueError(f"unknown mode {mode!r}; expected 'user' or 'ai-research'")
 
     for question in QUESTIONS:
@@ -111,7 +108,15 @@ def _record(state: InterviewState, question: dict, raw: str) -> None:
 def _ai_draft(tool_surface: ToolSurface, question: dict, idea: str) -> str:
     try:
         return tool_surface.draft_answer(question=question, idea=idea)
+    except (UserAbortError, KeyboardInterrupt):
+        # PR #22 round 8 (major #1): preserve user-abort semantics
+        # through the tool-surface layer. Re-raise so the CLI exits 3
+        # instead of swallowing it as InterviewIncompleteError (exit 4).
+        raise
     except Exception as exc:
+        # PR #22 round 8 (major #1): surface only type(exc).__name__
+        # to the caller; full traceback belongs in logs.
         raise InterviewIncompleteError(
-            f"tool-surface error while drafting {question['id']!r}: {exc}"
+            f"tool-surface error while drafting {question['id']!r}: "
+            f"{type(exc).__name__}"
         ) from exc
