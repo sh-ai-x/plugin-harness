@@ -18,14 +18,14 @@
   1. first-person — the user is the first user (this very request). Different origin: self.
   2. prior failed attempt — plan #7 was merged without the interview-driven ideation layer; the gap was identified post-merge. Different origin: prior internal work.
   3. analogue product — ChatGPT Custom GPTs and Claude Projects prove market demand for "anyone-configures-an-AI-for-a-team"; the gap is no-code plugin authoring with structured ideation. Different origin: market analogue.
-- **LTV × reachable / cost**: $2,000 × 500 / $30,000 = **value_score 3.33** (PASS, threshold 3.0)
+- **LTV × reachable / cost**: $2,000 × 500 / $30,000 = $1,000,000 / $30,000 = **value_score 33.33** (PASS, threshold 3.0)
 - **ambiguity**: 10 → 8 (asked implicitly: "what is the smallest 2-week version that pays for itself, and the one number that moves?"). User delegated with "you decide" — accepted the smallest 2-week version = 5-question CLI interview + idea-plan assembler + Codex-layout emitter (steps 0–3 of the phase). The "one number that moves" = **time-to-first-team-plugin** (target: ≤ 30 min from `plugin-harness new` to a runnable plugin on both runtimes).
 - **next**: ambiguity_score 8 (still >3). Continue loop.
 
 ## # gate-2 cycle 2
 
 - **evidence**: unchanged (3 sources, no new asks).
-- **value**: unchanged (3.33).
+- **value**: unchanged (33.33).
 - **ambiguity**: 8 → 5 (asked implicitly: "what is the kill condition?"). User did not answer explicitly; accepted as **kill = if a non-developer cannot complete the 5-question interview and ship a working plugin in under 30 minutes unaided**.
 - **next**: still 5 > 3, continue.
 
@@ -44,7 +44,7 @@ PASS  iff  evidence_count >= 3
         AND ambiguity_score <= 3
 
 actual:  evidence_count = 3 ✓
-         value_score    = 3.33 ✓
+         value_score    = 33.33 ✓
          ambiguity_score = 3  ✓
 
 RESULT: PASS

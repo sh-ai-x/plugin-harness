@@ -14,7 +14,7 @@
   1. first-person — the user is the first user
   2. prior failed attempt — plan #7 merged without the interview-driven ideation layer
   3. analogue product — ChatGPT Custom GPTs / Claude Projects prove demand for "anyone-configures-an-AI-for-a-team"
-- **value_score**: 3.33 (PASS, threshold ≥3.0) — `$2,000 LTV × 500 reachable users / $30,000 cost`
+- **value_score**: 33.33 (PASS, threshold ≥3.0) — `$2,000 LTV × 500 reachable users / $30,000 cost = $1,000,000 / $30,000`
 - **ambiguity_score**: 3 (PASS, threshold ≤3) — narrowed 10 → 3 over 3 cycles (scope, kill, second-persona knobs)
 - **convergence**: PASS. Detail in `.prd/decision-log.md` and `.dev-kit/loop-log.json`.
 

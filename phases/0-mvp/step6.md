@@ -21,7 +21,7 @@ Pipeline: `interview (mode A, scripted stdin) → assembler → emitter → cc_a
 Files to create:
 - `scripts/e2e.sh` — bash entrypoint that runs the full pipeline against a temp project dir, asserts both adapters install, asserts emitted plugin passes validator
 - `tests/e2e/test_full_pipeline.py` — pytest that calls the same pipeline programmatically
-- `scripts/smoke.sh` — quick smoke (3-question abbreviated flow, both adapters install, validator passes)
+- `scripts/smoke.sh` — quick smoke (full 5-question flow, both adapters install, validator passes; per step 0 the 5-question contract is locked, so the smoke runs the full flow, not an abbreviation)
 - `tests/e2e/test_smoke.py` — pytest wrapper for smoke
 
 Non-negotiable rules:
@@ -36,7 +36,7 @@ AC1: bash scripts/e2e.sh → exit 0
 AC2: python -m pytest tests/e2e/test_full_pipeline.py -v → exit 0
 AC3: bash scripts/smoke.sh → exit 0
 AC4: python -m pytest tests/e2e/test_smoke.py -v → exit 0
-AC5: grep -r "dev-kit" /Users/sanghee/dev/plugin-harness/.claude/worktrees/plan-v2/src /Users/sanghee/dev/plugin-harness/.claude/worktrees/plan-v2/scripts /Users/sanghee/dev/plugin-harness/.claude/worktrees/plan-v2/tests 2>/dev/null → exit 1 (no matches)
+AC5: bash -c '! grep -rq "dev-kit" src/ scripts/ tests/ 2>/dev/null' → exit 0 (no dev-kit token in source, scripts, or tests)
 ```
 
 ## Verification & Status Update (REQUIRED before claiming done)
