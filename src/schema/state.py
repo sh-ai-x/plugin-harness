@@ -48,9 +48,13 @@ class InterviewState:
 
     # ---- public API ----
 
-    def current_question(self) -> dict[str, Any]:
+    def current_question(self) -> dict[str, Any] | None:
+        # PR #21 round 4: previously returned QUESTIONS[-1] past end,
+        # which silently stalled the interview UI and broke the
+        # is_complete() invariant by masquerading as 'still on last
+        # question'. Now returns None so callers must branch on end.
         if self._cursor >= len(QUESTIONS):
-            return QUESTIONS[-1]
+            return None
         return QUESTIONS[self._cursor]
 
     def is_complete(self) -> bool:
@@ -96,15 +100,17 @@ class InterviewState:
             )
         self.answers[qid] = value
 
-    def validate_answer(self, qid: str, value: Any) -> bool:
-        question = self._lookup_question(qid)
+    @staticmethod
+    def validate_answer(qid: str, value: Any) -> bool:
+        # PR #21 round 4: promoted to @staticmethod so from_dict can
+        # share the same validation path used by set_answer, eliminating
+        # the round-3 parallel-validator that the reviewer flagged as
+        # sure-to-diverge. min_length and max_length are read from
+        # the question dict; both required for a valid answer.
+        question = InterviewState._lookup_question(qid)
         if not isinstance(value, str):
             return False
         n = len(value)
-        # PR #21 review: per-question max_length cap (default 2000) bounds
-        # the memory-exhaustion DoS surface on the documented user-input
-        # trust boundary. min_length and max_length are read from the
-        # question dict; both are required for a valid answer.
         return question["min_length"] <= n <= question.get("max_length", float("inf"))
 
     # ---- (de)serialization) ----
@@ -149,7 +155,7 @@ class InterviewState:
                 )
             if not get_question(qid):  # pragma: no cover (already filtered above)
                 raise SchemaError(f"unknown question id: {qid!r}")
-            if not _validate_value_against_question(qid, value):
+            if not InterviewState.validate_answer(qid, value):
                 raise ValidationError(
                     f"payload answer for {qid!r} fails validation"
                 )
@@ -187,20 +193,3 @@ class InterviewState:
         # exception path leaves state in its post-construction state.
         state.answers = built
         return state
-
-def _validate_value_against_question(qid: str, value: Any) -> bool:
-    """Standalone validator used by from_dict to avoid mutating state.
-
-    Mirrors InterviewState.validate_answer without requiring a state
-    instance, so the from_dict build loop can stage answers in a local
-    dict and assign to state.answers atomically only after the full
-    loop succeeds (PR #21 security round 3, A10 atomicity).
-    """
-    try:
-        q = get_question(qid)
-    except KeyError:
-        return False
-    if not isinstance(value, str):
-        return False
-    n = len(value)
-    return q["min_length"] <= n <= q.get("max_length", float("inf"))
