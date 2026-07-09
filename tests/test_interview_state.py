@@ -293,3 +293,38 @@ def test_from_dict_enforces_per_question_max_length():
                 for qid in ["what-who-where", "why-this-problem", "how-it-works", "ai-usage", "how-verified"]
             }
         })
+
+
+# ---------- PR #21 security round 4 regression ----------
+def test_validate_answer_is_static_and_shared():
+    """🟠 major (round 4): validate_answer must be @staticmethod so from_dict
+    can share the same validation path. Asserts no instance required and
+    that the helper is callable from from_dict's build loop.
+    """
+    # Static: no instance needed
+    valid = InterviewState.validate_answer("what-who-where", _valid_answer("what-who-where"))
+    assert valid is True
+    invalid = InterviewState.validate_answer("what-who-where", "x" * 5)
+    assert invalid is False
+
+
+def test_module_no_longer_exports_private_validator():
+    """🟠 major (round 4): the round-3 _validate_value_against_question helper
+    must be removed in round 4 (its divergent logic was the round-4 finding).
+    """
+    import src.schema.state as state_mod
+    assert not hasattr(state_mod, "_validate_value_against_question"), (
+        "private validator helper must be removed — its divergent logic is the round-4 finding"
+    )
+
+
+def test_current_question_returns_none_past_end():
+    """🟠 major (round 4): current_question() past end returns None, not the
+    last question. Callers must branch on completion explicitly.
+    """
+    s = InterviewState()
+    for q in QUESTIONS:
+        s.set_answer(q["id"], _valid_answer(q["id"]))
+        s.advance()
+    assert s.is_complete() is True
+    assert s.current_question() is None
