@@ -130,9 +130,15 @@ def _derive_plugin_name(state: InterviewState) -> str:
     Falls back to ``"Untitled Plugin"`` when the answer is empty or
     yields no word tokens (the assembler rejects empty answers upstream,
     so this is a safety net only).
+
+    Unicode-aware: matches the word-character class with the UNICODE flag so Korean (Hangul),
+    Japanese (Hiragana/Katakana), Chinese (Han), Cyrillic, and other
+    non-ASCII scripts are preserved instead of falling through to the
+    "Untitled Plugin" fallback. PR #23 review (🟠 major): previous
+    [a-z0-9]+ regex dropped every Korean answer to the fallback.
     """
     first = state.answers.get("what-who-where", "").lower()
-    tokens = re.findall(r"[a-z0-9]+", first)[:5]
+    tokens = re.findall(r"\w+", first, flags=re.UNICODE)[:5]
     slug = "-".join(tokens).strip("-")
     if not slug:
         return "Untitled Plugin"

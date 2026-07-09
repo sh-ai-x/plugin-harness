@@ -247,3 +247,23 @@ def test_fixture_assembles_successfully() -> None:
     # Every fixture answer must appear in the plan.
     for qid, value in state.answers.items():
         assert value in out, f"fixture answer {qid!r} missing from assembled plan"
+
+# --------------------------------------------------------------------- regression
+def test_derive_plugin_name_handles_korean_answer() -> None:
+    """Regression: PR #23 review (🟠 major). _derive_plugin_name previously
+    used [a-z0-9]+ which dropped every Korean answer to the
+    "Untitled Plugin" fallback. Now uses \w+ with re.UNICODE so Hangul,
+    Hiragana/Katakana, Han, and other non-ASCII scripts are preserved.
+    """
+    from src.assembler.plan import _derive_plugin_name
+    state = InterviewState()
+    state.set_answer(
+        "what-who-where",
+        "플러그인 도우미는 한국어 사용자를 위한 메모 보조 도구입니다.",
+    )
+    name = _derive_plugin_name(state)
+    assert name != "Untitled Plugin"
+    # First Hangul word should be in the name (capitalize is a no-op for Hangul).
+    assert "플러그인" in name
+
+
