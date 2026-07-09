@@ -15,7 +15,7 @@
 | Gate | Result |
 |---|---|
 | 1 frame | captured (goal + target_user + situation) |
-| 2 validate | evidence 3 ✓, value 3.33 ✓, ambiguity 3 ✓ → PASS |
+| 2 validate | evidence 3 ✓, value 33.33 ✓, ambiguity 3 ✓ → PASS |
 | 3 non-goals | 5 entries with rationale + breach-response |
 | 4 decompose | 7 steps in `0-mvp`, dependency-first order |
 | 5 emit | PRD.md DoD pass, all 6 conditions |
@@ -31,7 +31,7 @@
 ## Carry-forward constraints
 
 - The 5-question interview order is locked. Reorder is a product change, not a refactor.
-- All emitted plugin files MUST validate against the Codex layout (https://developers.openai.com/codex/plugins, https://developers.openai.com/codex/skills).
+- All emitted plugin files MUST validate against the **vendored** Codex schema at `docs/codex-plugin.schema.json` (NOT against the live URLs at https://developers.openai.com/codex/plugins — those may change and are layout docs, not validation endpoints). The build step 3 replaces any placeholder marker in the vendored schema before the validator runs.
 - Zero `dev-kit` text references in any artifact (non-goal b). Sub-agents that emit dev-kit mentions fail review.
 - No log emission (non-goal 1). Defer to a later stage.
 - No GUI / web wizard (non-goal 5). CLI only.
