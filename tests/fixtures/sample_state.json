@@ -1,0 +1,10 @@
+{
+  "current_index": 5,
+  "answers": {
+    "what-who-where": "Marketing managers at mid-size SaaS companies, working in small growth teams, who need to operationalize AI for daily workflows without writing code.",
+    "why-this-problem": "Today they context-switch between ChatGPT and Notion AI for 5+ hours a week, and have no way to ship a team plugin that captures their workflow.",
+    "how-it-works": "The harness interviews the user through 5 fixed questions, assembles an idea plan, and emits a Codex-layout plugin with plugin.json, SKILL.md, and an empty .mcp.json. The plugin installs identically into Claude Code and Codex.",
+    "ai-usage": "An AI-research mode can draft answer drafts from a one-line idea using the runtime's tool surface (Bash / WebFetch / WebSearch in Claude Code, equivalents in Codex). The user-driven mode reads from stdin.",
+    "how-verified": "Each of the 7 build steps emits an AC suite covering emit, validate, idempotency, escape-injection, and schema-roundtrip. The validator runs the emitted plugin.json against the vendored Codex schema."
+  }
+}
