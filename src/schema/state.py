@@ -95,8 +95,12 @@ class InterviewState:
                 )
             state.answers[qid] = value
         # Honor caller-supplied cursor when it's a non-negative int.
+        # Note: `type(cursor) is int` (NOT isinstance) because in Python `bool`
+        # is a subclass of `int`; isinstance(True, int) is True. A payload like
+        # {"cursor": true} would otherwise silently set _cursor = 1 and skip
+        # question 0. See regression test_rejects_bool_cursor in test_interview_state.py.
         cursor = payload.get("cursor")
-        if isinstance(cursor, int) and cursor >= 0:
+        if type(cursor) is int and not isinstance(cursor, bool) and cursor >= 0:
             state._cursor = min(cursor, len(QUESTIONS))
         else:
             # Derive cursor from the highest canonical index with an answer.
