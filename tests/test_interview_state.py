@@ -57,6 +57,20 @@ def test_is_complete_false_when_only_some_answered():
     assert s.is_complete() is False
 
 
+def test_is_complete_true_when_all_answers_set_via_set_answer_without_advance():
+    """Regression for step-6 emitter's EmitError 'cannot emit: interview incomplete (have 5/5 answers)'.
+
+    `set_answer()` documents that it ONLY records the value (and validates); cursor advance
+    is `advance()`'s job. Therefore completeness must be a function of the answer set,
+    NOT coupled to the cursor position. Filling all 5 answers via set_answer alone,
+    without calling advance(), must yield is_complete() == True.
+    """
+    s = InterviewState()
+    for q in QUESTIONS:
+        s.set_answer(q["id"], _valid_answer(q["id"]))
+    assert s.is_complete() is True
+
+
 def test_set_answer_rejects_unknown_question_id():
     s = InterviewState()
     with pytest.raises(SchemaError):
