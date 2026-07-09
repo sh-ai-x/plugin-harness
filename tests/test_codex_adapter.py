@@ -9,6 +9,7 @@ entrypoint (`python -m src.engine.cli`).
 
 from __future__ import annotations
 
+import os
 import pathlib
 import tempfile
 from pathlib import Path
@@ -115,3 +116,55 @@ def test_register_codex_accepts_pathlib_path() -> None:
     assert params, "register_codex must declare at least one parameter"
     first = params[0]
     assert first.annotation in (pathlib.Path, "pathlib.Path") or first.name == "project_dir"
+
+
+# ---------- PR #26 review regression: A06 majors ----------
+def test_register_codex_refuses_symlink_under_project():
+    """A06-3: refuse the install if any path under the project is a symlink."""
+    import pytest
+    with tempfile.TemporaryDirectory() as td:
+        project = pathlib.Path(td)
+        # Pre-plant a symlink at the target SKILL.md path
+        skill_dir = project / ".agents" / "skills" / "plugin-harness"
+        skill_dir.mkdir(parents=True)
+        skill_md = skill_dir / "SKILL.md"
+        skill_md.symlink_to("/etc/passwd")
+        with pytest.raises(FileExistsError, match="refusing to write through symlink"):
+            register_codex(project)
+
+
+def test_register_codex_atomic_write_creates_no_tempfile_residue():
+    """A06-1: success path leaves no .tmp residue under the project."""
+    with tempfile.TemporaryDirectory() as td:
+        project = pathlib.Path(td)
+        register_codex(project)
+        residual = list((project / ".agents").rglob("*.tmp"))
+        assert residual == [], f"unexpected tempfile residue: {residual}"
+
+
+def test_register_codex_explicit_file_mode_0o644(tmp_path):
+    """A02 minor: explicit mode 0o644 — not world-writable under permissive umask."""
+    old_umask = os.umask(0o000)  # worst-case permissive
+    try:
+        register_codex(tmp_path)
+        skill = tmp_path / ".agents" / "skills" / "plugin-harness" / "SKILL.md"
+        mode = skill.stat().st_mode & 0o777
+        assert mode == 0o644, f"expected 0o644, got {oct(mode)}"
+    finally:
+        os.umask(old_umask)
+
+
+def test_register_codex_backup_prior_when_file_exists():
+    """A06-2: a pre-existing SKILL.md is preserved as a .bak.<ts> sibling."""
+    import re
+    with tempfile.TemporaryDirectory() as td:
+        project = pathlib.Path(td)
+        skill_dir = project / ".agents" / "skills" / "plugin-harness"
+        skill_dir.mkdir(parents=True)
+        skill_md = skill_dir / "SKILL.md"
+        skill_md.write_text("hand-authored content", encoding="utf-8")
+        register_codex(project)
+        # The new SKILL.md reflects the bundled install; the prior is preserved
+        backups = list(skill_dir.glob("SKILL.md.bak.*"))
+        assert len(backups) == 1
+        assert backups[0].read_text(encoding="utf-8") == "hand-authored content"

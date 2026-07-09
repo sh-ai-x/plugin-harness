@@ -13,6 +13,9 @@ of the engine.
 
 from __future__ import annotations
 
+import os
+import stat
+import tempfile
 from importlib import resources
 from pathlib import Path
 
@@ -76,11 +79,92 @@ def register_codex(project_dir: Path) -> Path:
     -------
     pathlib.Path
         Absolute path to the written SKILL.md.
+
+    Raises
+    ------
+    FileExistsError
+        If the target or any parent under the install path is a symlink.
+        Hard-fails rather than follow the symlink (PR #26 review A06-3:
+        symlink-following writes are a defense-in-depth gap on shared FS).
     """
     target = Path(project_dir) / CODEX_SKILL_REL_PATH
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(_bundled_skill_text(), encoding="utf-8")
+    _refuse_if_symlink_chain(target)  # A06-3
+    if target.is_file():
+        _backup_existing(target)  # A06-2 (preserve prior content)
+    content = _bundled_skill_text()
+    _atomic_write_text(target, content)  # A06-1 + file mode
     return target
+
+
+def _refuse_if_symlink_chain(target: Path) -> None:
+    """Refuse the install if `target` or any parent UNDER the project is a symlink.
+
+    Defense-in-depth (PR #26 A06-3): an attacker who pre-plants
+    `.agents/skills/plugin-harness/SKILL.md` (or any parent under the
+    install root) as a symlink can otherwise divert the install into
+    an arbitrary host path writable by the installer. Sibling-tempfile +
+    os.replace does not follow symlinks at the rename target on POSIX,
+    so checking the chain here is belt-and-suspenders.
+
+    Only checks paths at or below the project_dir's resolved root.
+    macOS exposes /var -> /private/var, /tmp -> /private/tmp, etc. —
+    those symlinks live above the project root and are not attacker-
+    controlled, so they are out of scope.
+    """
+    project_root = target.parents[2]  # target = project_dir/.agents/skills/<name>/SKILL.md
+    for path in (target, *target.parents):
+        if path.is_symlink():
+            raise FileExistsError(
+                f"refusing to write through symlink: {path}"
+            )
+        if path == project_root:
+            break
+
+
+def _backup_existing(target: Path) -> None:
+    """Snapshot a pre-existing SKILL.md before overwriting (A06-2).
+
+    The reviewer's preferred alternative (refuse-if-foreign) breaks
+    idempotent re-runs on hand-authored content. Backing up to a
+    timestamped sibling preserves prior content while still honoring
+    the idempotent-re-run contract.
+    """
+    import datetime as _dt
+    ts = _dt.datetime.now().strftime("%Y%m%dT%H%M%S")
+    backup = target.with_suffix(target.suffix + f".bak.{ts}")
+    backup.write_text(target.read_text(encoding="utf-8"), encoding="utf-8")
+
+
+def _atomic_write_text(target: Path, content: str) -> None:
+    """Write `content` to `target` atomically with explicit file mode.
+
+    PR #26 A06-1: target.write_text truncates the existing file before
+    the new bytes are fully flushed. SIGKILL / ENOSPC / power-loss
+    mid-write leaves a truncated SKILL.md at the Codex discovery path.
+    The sibling-tempfile + os.replace pattern is atomic on POSIX.
+
+    PR #26 A02 minor: explicit mode=0o644 so the file does not end up
+    world-writable under permissive umasks (common in slim containers
+    and some CI providers).
+    """
+    fd, tmp_name = tempfile.mkstemp(
+        prefix=target.name + ".",
+        suffix=".tmp",
+        dir=str(target.parent),
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+        os.chmod(tmp_name, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
+        os.replace(tmp_name, target)
+    except BaseException:
+        # Clean up the temp file on any failure path.
+        try:
+            os.unlink(tmp_name)
+        except FileNotFoundError:
+            pass
+        raise
 
 
 __all__ = ["register_codex", "CODEX_SKILL_REL_PATH"]
