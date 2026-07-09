@@ -8,7 +8,7 @@
   "evidence_count": 3,
   "steps": [
     {"step": 0, "name": "question-schema", "title": "5-question schema + interview state", "status": "completed", "ambiguity_delta": -2.0, "summary": "Created src/schema/{questions.py,state.py,__init__.py} + 33 pytest tests; AC1-AC4 all exit 0; 5 canonical questions locked in order; round-trip serialization verified"},
-    {"step": 1, "name": "interview-engine", "title": "Interview engine (2 modes)", "status": "pending", "ambiguity_delta": -2.0},
+    {"step": 1, "name": "interview-engine", "title": "Interview engine (2 modes)", "status": "completed", "ambiguity_delta": -2.0, "summary": "Created src/engine/{runner,cli}.py + modes/{user_driven,ai_research}.py; both modes drive InterviewState to completion via injected stdin/tool surface with typed InterviewIncompleteError/UserAbortError and exit codes 0/2/3/4"},
     {"step": 2, "name": "idea-plan-assembler", "title": "Idea-plan assembler", "status": "pending", "ambiguity_delta": -1.0},
     {"step": 3, "name": "dual-runtime-emitter", "title": "Dual-runtime plugin emitter", "status": "pending", "ambiguity_delta": -2.0},
     {"step": 4, "name": "cc-adapter", "title": "Claude Code adapter", "status": "pending", "ambiguity_delta": -0.5},
