@@ -47,12 +47,14 @@ Non-negotiable rules:
 - Section 6 (synthesis) is generated; sections 1-5 are direct quotes of answers.
 - Empty answer → raise `AssemblerError`, do not silently skip.
 - Output is deterministic for a given state (same input → same output byte-for-byte).
+- User-supplied answer text MUST be Markdown-escaped before insertion into the assembled plan (escape `[`, `]`, `<`, `>`, `` ` ``, `#`, `*`, `_`, and any leading `>`) to prevent Markdown injection. Section headings stay hard-coded; only the answer body is escaped.
 
 ## Acceptance Criteria
 ```bash
-AC1: python -m pytest tests/test_assembler.py -v → exit 0 (all-sections, missing-answer, determinism)
+AC1: python -m pytest tests/test_assembler.py -v → exit 0 (all-sections, missing-answer, determinism, escape-injection)
 AC2: python -c "from src.assembler.plan import assemble; from src.schema.state import InterviewState; s=InterviewState(); [s.set_answer(q,'x'*30) for q in ['what-who-where','why-this-problem','how-it-works','ai-usage','how-verified']]; out=assemble(s); assert all(h in out for h in ['## 1.','## 2.','## 3.','## 4.','## 5.','## 6.'])" → exit 0
 AC3: python -c "from src.assembler.plan import assemble; from src.schema.state import InterviewState; s=InterviewState(); out=assemble(s)" 2>&1 | grep -q "AssemblerError" → exit 0
+AC4: python -c "from src.assembler.plan import assemble; from src.schema.state import InterviewState; s=InterviewState(); s.set_answer('what-who-where','## injected heading\\n<script>alert(1)</script>'); [s.set_answer(q,'x'*30) for q in ['why-this-problem','how-it-works','ai-usage','how-verified']]; out=assemble(s); assert '## injected heading' not in out and '<script>' not in out" → exit 0 (escape injection neutralized)
 ```
 
 ## Verification & Status Update (REQUIRED before claiming done)

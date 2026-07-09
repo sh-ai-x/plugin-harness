@@ -5,7 +5,6 @@
 
 ## Read first
 - `/PRD.md`
-- `/docs/ARCHITECTURE.md` (does not exist yet — created in step 1 if needed)
 - `phases/0-mvp/step0.md` (this file)
 
 ## Task

@@ -31,7 +31,7 @@ Non-negotiable rules:
 ```bash
 AC1: python -m pytest tests/test_codex_adapter.py -v → exit 0 (file creation + idempotency + content sanity)
 AC2: python -c "from src.adapter.codex import register_codex; import pathlib, tempfile; d=pathlib.Path(tempfile.mkdtemp()); register_codex(d); files=list(d.rglob('SKILL.md')); assert len(files) >= 1" → exit 0
-AC3: grep -q "dev-kit" $(find /Users/sanghee/dev/plugin-harness/.claude/worktrees/plan-v2/src/adapter -type f) 2>/dev/null && exit 1 || exit 0
+AC3: bash -c '! grep -rq "dev-kit" src/adapter/ 2>/dev/null' → exit 0 (no dev-kit token in adapter source)
 ```
 
 ## Verification & Status Update (REQUIRED before claiming done)
@@ -50,5 +50,5 @@ AC3: grep -q "dev-kit" $(find /Users/sanghee/dev/plugin-harness/.claude/worktree
 ## Don't
 - Do not duplicate the engine logic. 이유: step 1 owns the engine; this step only adapts the surface for Codex.
 - Do not mention "dev-kit" in any emitted file. 이유: non-goal (b).
-- Do not write outside `src/adapter/`, `tests/test_codex_adapter.py`, `tests/fixtures/codex_install/`. 이유: path scope.
+- Do not write outside `src/adapter/`, `tests/test_codex_adapter.py`, `tests/fixtures/codex_install/`, EXCEPT the adapter install paths under `.codex/skills/` inside the target `project_dir` passed to `register_codex`. Those writes are the adapter's contract — they are NOT inside the plugin's own source tree. 이유: path scope clarification.
 - Do not skip TDD. 이유: Iron Law L1.

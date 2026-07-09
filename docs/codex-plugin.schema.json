@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://developers.openai.com/codex/plugins/plugin.schema.json",
+  "title": "Codex Plugin Manifest",
+  "description": "Schema for the plugin.json manifest. Pinned placeholder — replace with the live vendored copy at build step 3 from https://developers.openai.com/codex/plugins.",
+  "type": "object",
+  "required": ["name", "version", "description"],
+  "properties": {
+    "name": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,63}$", "description": "kebab-case plugin name, 2-64 chars"},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+([-+].+)?$", "description": "semver"},
+    "description": {"type": "string", "minLength": 1, "maxLength": 200},
+    "skills": {"type": "array", "items": {"type": "string"}},
+    "mcpServers": {"type": "array", "items": {"type": "object"}}
+  },
+  "additionalProperties": true
+}
