@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .questions import QUESTIONS, _QUESTION_BY_ID, canonical_ids
+from .questions import QUESTIONS, canonical_ids, get_question
 
 
 class SchemaError(Exception):
@@ -30,10 +30,14 @@ class InterviewState:
 
     @staticmethod
     def _lookup_question(qid: str) -> dict[str, Any]:
-        q = _QUESTION_BY_ID.get(qid)
-        if q is None:
-            raise SchemaError(f"unknown question id: {qid!r}")
-        return q
+        # PR #21 review: switched from the private question-by-id dict
+        # to the public get_question() accessor, with a KeyError to
+        # SchemaError translation so the unknown-id contract stays
+        # consistent across this module.
+        try:
+            return get_question(qid)
+        except KeyError as exc:
+            raise SchemaError(f"unknown question id: {qid!r}") from exc
 
     # ---- public API ----
 
@@ -50,11 +54,12 @@ class InterviewState:
             self._cursor += 1
 
     def set_answer(self, qid: str, value: Any) -> None:
-        self._lookup_question(qid)  # raises SchemaError on unknown id
+        question = self._lookup_question(qid)  # raises SchemaError on unknown id
         if not self.validate_answer(qid, value):
+            n = len(value) if isinstance(value, str) else 0
             raise ValidationError(
-                f"invalid answer for {qid!r}: must be str with len >= "
-                f"{_QUESTION_BY_ID[qid]['min_length']}"
+                f"invalid answer for {qid!r}: length {n} outside "
+                f"[{question['min_length']}, {question.get('max_length', 'inf')}]"
             )
         self.answers[qid] = value
 
@@ -62,7 +67,12 @@ class InterviewState:
         question = self._lookup_question(qid)
         if not isinstance(value, str):
             return False
-        return len(value) >= question["min_length"]
+        n = len(value)
+        # PR #21 review: per-question max_length cap (default 2000) bounds
+        # the memory-exhaustion DoS surface on the documented user-input
+        # trust boundary. min_length and max_length are read from the
+        # question dict; both are required for a valid answer.
+        return question["min_length"] <= n <= question.get("max_length", float("inf"))
 
     # ---- (de)serialization ----
 
@@ -81,7 +91,8 @@ class InterviewState:
         raw_answers = payload.get("answers", {})
         if not isinstance(raw_answers, dict):
             raise SchemaError("payload['answers'] must be a dict")
-        unknown = [k for k in raw_answers.keys() if k not in _QUESTION_BY_ID]
+        ids = canonical_ids()
+        unknown = [k for k in raw_answers.keys() if k not in ids]
         if unknown:
             raise SchemaError(
                 f"payload contains unknown question ids: {sorted(unknown)!r}"
@@ -103,11 +114,14 @@ class InterviewState:
         if type(cursor) is int and not isinstance(cursor, bool) and cursor >= 0:
             state._cursor = min(cursor, len(QUESTIONS))
         else:
-            # Derive cursor from the highest canonical index with an answer.
-            max_idx = -1
-            for qid in raw_answers.keys():
-                idx = canonical_ids().index(qid)
-                if idx > max_idx:
-                    max_idx = idx
-            state._cursor = max_idx + 1 if max_idx >= 0 else 0
+            # PR #21 review: previous derivation jumped to max(answered)+1
+            # and stranded earlier canonical questions if answers arrived
+            # out of order (e.g. Q4 answered before Q0). Walk canonical_ids()
+            # to the first unanswered question so re-runs prompt for the
+            # right next question.
+            state._cursor = 0
+            for qid in canonical_ids():
+                if qid not in state.answers:
+                    break
+                state._cursor += 1
         return state
