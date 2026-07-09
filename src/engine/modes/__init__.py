@@ -1,0 +1,1 @@
+"""Interview mode handlers: user-driven (stdin) and AI-research (tool surface)."""
