@@ -60,7 +60,13 @@ def run_interview(
                 raise UserAbortError("interrupted by user (Ctrl-C)")
         else:
             assert tool_surface is not None, "ai-research mode requires tool_surface"
-            raw = _ai_draft(tool_surface, question, idea)
+            try:
+                raw = _ai_draft(tool_surface, question, idea)
+            except KeyboardInterrupt:
+                # PR #22 review (🟠 major A10-006): ai-research branch was
+                # propagating KeyboardInterrupt as a traceback + exit 1,
+                # inconsistent with user-mode's UserAbortError + exit 3.
+                raise UserAbortError("interrupted by user (Ctrl-C)")
 
         _record(state, question, raw)
 

@@ -310,3 +310,27 @@ def test_runner_rejects_unknown_mode():
             tool_surface=_FakeToolSurface(),
             stdout_writer=_stdout_writer(_stdout_capture()),
         )
+
+# ---------- PR #22 review regression: KeyboardInterrupt parity ----------
+def test_mode_ai_research_keyboardinterrupt_translates_to_user_abort():
+    """PR #22 review (🟠 major A10-006): ai-research branch was leaking
+    KeyboardInterrupt as traceback + exit 1, inconsistent with user-mode's
+    UserAbortError + exit 3. Verify the translator site lives in runner.
+    """
+    from src.engine.runner import run_interview, UserAbortError
+
+    class _KbIntToolSurface:
+        def draft_answer(self, *, question: dict, idea: str) -> str:
+            raise KeyboardInterrupt("Ctrl-C")
+
+    state = InterviewState()
+    with pytest.raises(UserAbortError):
+        run_interview(
+            state,
+            mode="ai-research",
+            idea="some idea",
+            tool_surface=_KbIntToolSurface(),
+            stdout_writer=None,
+            stdin_reader=None,
+        )
+    assert state.answers == {}, "no answers should be recorded on Ctrl-C"
