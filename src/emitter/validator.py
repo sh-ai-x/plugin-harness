@@ -45,12 +45,20 @@ def validate_emit(output_dir: Path) -> ValidationReport:
     readme_path = expected["README.md"]
     skills_root = expected["SKILL.md"]  # directory
 
+    # PR #27 review (🔴 critical): each 'missing required file' branch
+    # appends to errors and returns ValidationReport(ok=False, ...) so
+    # the later stat().st_size and read_text() calls do not raise an
+    # uncaught FileNotFoundError. Missing-file reports stay first-class
+    # failures; the validator no longer crashes mid-walk.
     if not plugin_json_path.is_file():
         errors.append(f"plugin.json missing at {plugin_json_path}")
+        return ValidationReport(ok=False, errors=errors)
     if not mcp_path.is_file():
         errors.append(f".mcp.json missing at {mcp_path}")
+        return ValidationReport(ok=False, errors=errors)
     if not readme_path.is_file():
         errors.append(f"README.md missing at {readme_path}")
+        return ValidationReport(ok=False, errors=errors)
     if not skills_root.is_dir():
         errors.append(f"skills directory missing at {skills_root}")
         return ValidationReport(ok=False, errors=errors)
@@ -114,10 +122,16 @@ def validate_emit(output_dir: Path) -> ValidationReport:
             errors.append(".mcp.json.mcpServers must be an array")
 
     # ------------------------------------------------------------ SKILL.md non-empty
+    if not skill_md.is_file():
+        errors.append(f"SKILL.md missing at {skill_md}")
+        return ValidationReport(ok=False, errors=errors)
     if skill_md.stat().st_size == 0:
         errors.append(f"SKILL.md is empty at {skill_md}")
 
     # ------------------------------------------------------------ README.md non-empty
+    if not readme_path.is_file():
+        errors.append(f"README.md missing at {readme_path}")
+        return ValidationReport(ok=False, errors=errors)
     if readme_path.stat().st_size == 0:
         errors.append(f"README.md is empty at {readme_path}")
 
