@@ -2,6 +2,21 @@
 from __future__ import annotations
 
 from typing import Any, Callable, Optional
+from typing import Protocol
+
+# PR #22 review (🟠 major): ToolSurface was previously `Any`, which
+# discarded the contract. ai-research calls
+# `tool_surface.draft_answer(question=question, idea=idea)` and the
+# docstring + FakeToolSurface in tests must agree on the same
+# keyword-only signature. Promote to a runtime.Protocol so callers
+# can type-check without forcing a subclassing dependency.
+class ToolSurface(Protocol):
+    def draft_answer(self, *, question: dict, idea: str) -> str:
+        """Draft an answer to one interview question.
+
+        Keyword-only signature: callers (the runner) and fakes (the
+        tests) must agree. Returns the answer as a string.
+        """
 
 from src.schema.questions import QUESTIONS
 from src.schema.state import InterviewState, SchemaError, ValidationError
@@ -9,7 +24,6 @@ from src.schema.state import InterviewState, SchemaError, ValidationError
 
 StdinReader = Callable[[str], str]
 StdoutWriter = Callable[[str], None]
-ToolSurface = Any
 
 
 class InterviewIncompleteError(RuntimeError):

@@ -1,7 +1,8 @@
 """Mode B — AI-research: calls the runtime's tool surface to draft each answer.
 
 The tool surface is injected at the CLI layer. It must expose
-`draft_answer(question, idea) -> str` and may additionally use web_search /
+`draft_answer(*, question, idea) -> str` (keyword-only, matching the
+`ToolSurface` Protocol in runner.py) and may additionally use web_search /
 web_fetch to gather material before drafting. This module itself performs no I/O.
 """
 from __future__ import annotations
