@@ -48,6 +48,13 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+# PR #22 round 9 (🟡 minor): cap the --idea argument at the CLI layer
+# so DefaultToolSurface cannot allocate an unbounded f-string before
+# max_length validation rejects it. 2000 chars matches per-question
+# max_length in src/schema/questions.py (the answer-side cap).
+MAX_IDEA_LENGTH = 2000
+
+
 def _print(line: str) -> None:
     sys.stdout.write(line + "\n")
     sys.stdout.flush()
@@ -65,19 +72,22 @@ def main(argv: Optional[List[str]] = None) -> int:
         _print(f"unknown subcommand {args.subcommand!r}")
         return 2
 
-    if args.mode not in VALID_MODES:
-        _print(f"invalid choice: {args.mode!r} (choose from {VALID_MODES})")
+    # PR #22 round 9 (🟠 major): data-driven dispatch via MODE_DISPATCH.
+    # Each mode module self-registers a setup callable at import
+    # time; cli.py looks it up by name.
+    from src.engine.modes import MODES, MODE_DISPATCH
+    if args.mode not in MODES:
+        _print(f"invalid choice: {args.mode!r} (choose from {MODES})")
+        return 2
+    if args.mode not in MODE_DISPATCH:
+        _print(f"mode {args.mode!r} is not yet wired up at the CLI layer")
         return 2
 
     state = InterviewState()
     writer = make_writer(None)
-
-    if args.mode == "user":
-        reader = make_reader(None)
-        tool_surface = None
-    else:
-        reader = None
-        tool_surface = make_tool_surface(None)
+    reader, _, tool_surface = MODE_DISPATCH[args.mode](
+        make_reader, make_writer, make_tool_surface
+    )
 
     try:
         run_interview(

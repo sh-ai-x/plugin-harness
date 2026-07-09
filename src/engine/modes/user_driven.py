@@ -38,3 +38,9 @@ def make_reader(reader: Optional[Callable[[str], str]]) -> Callable[[str], str]:
 
 def make_writer(writer: Optional[Callable[[str], None]]) -> Callable[[str], None]:
     return writer if writer is not None else default_stdout_writer
+
+# PR #22 round 9: register this mode's setup with the dispatch table.
+from src.engine.modes import register_mode
+def _setup_user_mode(make_reader, make_writer, _make_tool_surface):
+    return make_reader(None), make_writer(None), None
+register_mode("user", _setup_user_mode)
