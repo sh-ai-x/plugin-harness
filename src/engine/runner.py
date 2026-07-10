@@ -78,23 +78,34 @@ def run_interview(
     for question in QUESTIONS:
         _prompt(question, stdout_writer)
 
-        if mode == "user":
-            assert stdin_reader is not None, "user mode requires stdin_reader"
-            try:
-                raw = stdin_reader(question["prompt"])
-            except UserAbortError:
-                raise
-            except KeyboardInterrupt:
-                raise UserAbortError("interrupted by user (Ctrl-C)")
-        else:
-            assert tool_surface is not None, "ai-research mode requires tool_surface"
-            try:
-                raw = _ai_draft(tool_surface, question, idea)
-            except KeyboardInterrupt:
-                # PR #22 review (🟠 major A10-006): ai-research branch was
-                # propagating KeyboardInterrupt as a traceback + exit 1,
-                # inconsistent with user-mode's UserAbortError + exit 3.
-                raise UserAbortError("interrupted by user (Ctrl-C)")
+        # PR #22 round 11 (🟠 major): data-driven per-question dispatch
+        # via MODE_DISPATCH. Each mode module self-registers a per-
+        # question callable at import time; runner looks it up by name.
+        from src.engine.modes import MODE_DISPATCH
+        if mode not in MODE_DISPATCH:
+            raise ValueError(
+                f"mode {mode!r} is in MODES but not in MODE_DISPATCH; "
+                "did its module's register_mode() call run?"
+            )
+        # PR #22 round 11 (🟠 major): per-mode handler may itself raise
+        # InterviewIncompleteError (e.g. DefaultToolSurface in
+        # ai_research.py wraps surface errors). Re-raise those as-is
+        # rather than double-wrapping; otherwise the CLI message
+        # would surface "InterviewIncompleteError" instead of the
+        # actual surface-error type name.
+        try:
+            raw = MODE_DISPATCH[mode](question, idea, stdin_reader, tool_surface)
+        except KeyboardInterrupt:
+            raise UserAbortError("interrupted by user (Ctrl-C)")
+        except UserAbortError:
+            raise
+        except InterviewIncompleteError:
+            raise
+        except Exception as exc:
+            raise InterviewIncompleteError(
+                f"tool-surface error while drafting {question['id']!r}: "
+                f"{type(exc).__name__}"
+            ) from exc
 
         _record(state, question, raw)
 

@@ -39,22 +39,26 @@ _MODES: tuple[str, ...] = (
 )
 
 
-_MODE_DISPATCH: dict[str, Callable] = {}
+# PR #22 round 11 (🟠 major): the registry now stores per-question
+# callables, not setup tuples. The runner looks up the per-question
+# callable by mode name; cli.py builds (reader, writer, surface)
+# separately from the registry (see cli.py round 9 dispatch).
+MODE_DISPATCH: dict[str, Callable] = {}
 
 
-def register_mode(name: str, setup: Callable) -> None:
-    """Register a setup callable for `name` in MODE_DISPATCH.
+def register_mode(name: str, per_question: Callable) -> None:
+    """Register a per-question callable for `name` in MODE_DISPATCH.
 
     Used by mode modules at import time. Re-registering an existing
     name overrides the prior entry; tests rely on that to swap in a
     fake surface for ai-research.
     """
-    _MODE_DISPATCH[name] = setup
+    MODE_DISPATCH[name] = per_question
 
 
 def dispatch_for(name: str) -> Callable:
-    """Look up the setup callable for `name`. Raises KeyError on miss."""
-    return _MODE_DISPATCH[name]
+    """Look up the per-question callable for `name`. Raises KeyError on miss."""
+    return MODE_DISPATCH[name]
 
 
 # Public read-only view of the dispatch table. A separate MODES tuple
@@ -63,7 +67,7 @@ def dispatch_for(name: str) -> Callable:
 # the dynamic "what's wired up" view (always a subset of MODES in
 # practice).
 MODES = _MODES
-MODE_DISPATCH = _MODE_DISPATCH
+
 
 
 # Import the mode modules here so their register_mode() calls fire at
