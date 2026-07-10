@@ -25,6 +25,7 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
+from src.emitter._shared.md_escape import md_escape
 from src.schema.questions import QUESTIONS, canonical_ids
 from src.schema.state import InterviewState
 
@@ -60,60 +61,14 @@ _SECTION_TITLES: dict[str, str] = {
 # ---- Markdown escape --------------------------------------------------------
 
 
-# Order is significant: < first (does not introduce newlines), then > with
-# leading-aware handling, then the inline-punctuation tokens, then the
-# heading-anchor (#) last. We do NOT escape '!' — AC4 verifies it stays raw.
-def _escape_markdown(text: str) -> str:
-    """Neutralize Markdown-significant characters in user-supplied answer text.
-
-    Escape table (per phases/0-mvp/step2.md AC4):
-        '<'     -> '&lt;'
-        '>'     -> '\\>'   (start of string, OR preceded by actual '\\n',
-                            OR preceded by literal '\\' — the case after
-                            a literal '\\n' two-char sequence in the input)
-              -> '&gt;'   (otherwise)
-        '['     -> '\\['
-        ']'     -> '\\]'
-        '('     -> '\\('
-        ')'     -> '\\)'
-        '`'     -> '\\`'
-        '#'     -> '&#35;'
-        '*'     -> '\\*'
-        '_'     -> '\\_'
-
-    '!' is intentionally NOT escaped (image-syntax break is acceptable;
-    AC4 verifies `!important` stays raw). Section headings are NOT escaped
-    because they are hard-coded strings, not user input.
-
-    The '>' substitution is done in a single regex pass so the '>' inside
-    any '\\>' we just inserted is not re-matched. The "<" pass is run first
-    so its replacement '&lt;' does not collide with the '>' pass.
-    """
-    if not text:
-        return text
-    # 1. '<' first so its replacement '&lt;' does not introduce a '<'.
-    out = text.replace("<", "&lt;")
-    # 2. '>' — leading (start of input, OR preceded by '\\n' literal 2-char,
-    #    OR preceded by actual newline char) -> '\\>'. Else -> '&gt;'.
-    def _gt_repl(match: "re.Match[str]") -> str:
-        i = match.start()
-        if i == 0:
-            return "\\>"
-        prev = out[i - 1]
-        if prev == "\\" or prev == "\n":
-            return "\\>"
-        return "&gt;"
-    out = re.sub(">", _gt_repl, out)
-    # 3-10. remaining tokens
-    out = out.replace("[", "\\[")
-    out = out.replace("]", "\\]")
-    out = out.replace("(", "\\(")
-    out = out.replace(")", "\\)")
-    out = out.replace("`", "\\`")
-    out = out.replace("#", "&#35;")
-    out = out.replace("*", "\\*")
-    out = out.replace("_", "\\_")
-    return out
+# PR #27 LLM review (🟠 major #3): the local `_escape_markdown` table
+# here disagreed with codex.py's `_md_escape` on (`(`, `)`) coverage
+# and on the `#` representation (HTML entity vs backslash-prefix).
+# Both files now route through `md_escape` from
+# `src.emitter._shared.md_escape` so the plan assembler and the
+# Codex emitter agree on a single canonical escape table.
+# (Function `md_escape` is imported above; this stub remains as a
+# regression-detection marker.)
 
 
 # ---- Plugin-name derivation -------------------------------------------------
@@ -166,7 +121,7 @@ def _derive_synthesis(state: InterviewState) -> str:
     )
     for bridge, source in zip(bridges, sources):
         snippet = _first_n_words(source, 60)
-        fragments.append(f"{bridge} {_escape_markdown(snippet)}".strip())
+        fragments.append(f"{bridge} {md_escape(snippet)}".strip())
     paragraph = " ".join(fragments)
     words = paragraph.split()
     if len(words) > SYNTHESIS_MAX_WORDS:
@@ -237,7 +192,7 @@ def assemble(state: InterviewState) -> str:
             {
                 "qid": qid,
                 "title": _SECTION_TITLES[qid],
-                "body": _escape_markdown(state.answers[qid]),
+                "body": md_escape(state.answers[qid]),
             }
         )
 

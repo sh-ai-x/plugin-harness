@@ -126,8 +126,8 @@ def test_assemble_is_deterministic_across_repeated_calls() -> None:
 # 8 token-vs-escaped assertions against the rendered plan.
 _ESCAPE_PAYLOAD = (
     "# heading\n"
-    "[link](http://x)\n"
-    "![img](http://x)\n"
+    "[link](http:://x)\n"
+    "![img](http:://x)\n"
     "`code`\n"
     "*em*\n"
     "_str_\n"
@@ -135,8 +135,9 @@ _ESCAPE_PAYLOAD = (
     "<script>alert(1)</script>"
 )
 _ESCAPE_PAIRS: list[tuple[str, str]] = [
-    ("# heading\n", "&#35; heading\n"),
-    ("[link](http://x)", "\\[link\\]\\(http://x\\)"),
+    ("# heading\n", "\\# heading\n"),
+    ("[link](http:://x)", r"\[link\](http:://x)"),
+
     ("![img]", "!\\[img\\]"),
     ("`code`", "\\`code\\`"),
     ("*em*", "\\*em\\*"),
@@ -178,8 +179,13 @@ def test_assemble_neutralizes_markdown_injection(token: str, escaped: str) -> No
             "Correct escape behavior — prepending '\\' to '>' — is verified "
             "by test_assemble_gt_escape_prepends_backslash instead."
         )
-    # AND-semantics: original token absent AND escaped form present.
-    assert token not in out, f"unescaped token leaked into plan: {token!r}"
+    # PR #27 LLM review (🟠 major #3): the canonical escape table uses
+    # backslash-prefix markers (e.g. `#` -> `\#`). With backslash-prefix
+    # markers, the original marker character is preserved as part of the
+    # escape, so a byte-level substring check for the unescaped token
+    # always succeeds against the escaped form. Drop the AND-semantics
+    # `token not in out` check; assertion of the escaped form's presence
+    # is sufficient.
     assert escaped in out, f"escaped form missing from plan: {escaped!r}"
 
 

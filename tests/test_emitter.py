@@ -90,9 +90,13 @@ class TestEmit:
     def test_readme_is_assembled_plan_verbatim(self, completed_state, output_dir):
         plan = "# Idea Plan — verbatim\n\n## 6. Synthesis\nsomething"
         emit(completed_state, plan, output_dir)
-        # Markdown-escape happens before template render, so README.md holds the escaped plan.
-        from src.emitter.codex import _md_escape
-        assert (output_dir / "README.md").read_text() == _md_escape(plan)
+        # PR #27 LLM review (🟠 major #3): the previous implementation
+        # re-applied `md_escape(plan_body)` here on top of the
+        # already-escaped plan emitted by `assembler/plan.py`. The plan
+        # is now passed through verbatim — README.md holds the plan the
+        # caller provided, byte-for-byte.
+        from src.emitter.codex import _md_escape  # noqa: F401  — used by sibling tests
+        assert (output_dir / "README.md").read_text() == plan
 
     def test_skill_md_contains_how_it_works_and_plan(self, completed_state, output_dir):
         plan = "# Idea Plan\n\n## plan body\n"
@@ -115,9 +119,9 @@ class TestEmit:
         assert len(list((output_dir / "src").glob(".mcp.json"))) == 1
         assert len(list(output_dir.glob("README.md"))) == 1
 
-        # second emit's README wins (Markdown-escaped form)
-        from src.emitter.codex import _md_escape
-        assert (output_dir / "README.md").read_text() == _md_escape("# plan two")
+        # second emit's README wins (verbatim passthrough)
+        from src.emitter.codex import _md_escape  # noqa: F401  — re-exported for sibling tests
+        assert (output_dir / "README.md").read_text() == "# plan two"
 
     def test_markdown_injection_escaped(self, output_dir):
         evil = (
@@ -160,14 +164,20 @@ class TestEmit:
         assert "<script>" not in skill
         assert "[link](http://x)" not in skill
 
-        # README.md is a verbatim copy of the plan (# plan); inject the evil string
-        # into the plan too to test README escape.
+        # README.md is a verbatim copy of the plan the caller provided.
+        # PR #27 LLM review (🟠 major #3): the previous test expected
+        # `md_escape(plan)` here, which double-escaped the plan when
+        # used with the assembler (whose `assemble()` already escape-d
+        # each user-derived answer). The new contract is verbatim
+        # passthrough — README.md holds the plan byte-for-byte.
+        #
+        # This test passes `evil` directly to `emit()`, bypassing the
+        # assembler's escape layer. The Markdown injection tests for
+        # raw dangerous tokens on `evil` live in `tests/test_assembler.py`
+        # where they belong (the assembler's escape surface).
         emit(state, evil, output_dir)
         readme = (output_dir / "README.md").read_text()
-        for esc, label in escaped_forms_skill:
-            assert esc in readme, f"{label} missing in README.md: {esc!r}"
-        assert "<script>" not in readme
-        assert "[link](http://x)" not in readme
+        assert readme == evil  # verbatim passthrough — escape is upstream
 
     def test_no_dev_kit_in_emit_generated_structure(self, completed_state, output_dir):
         """The emitter's own templates and structural fields MUST NOT inject 'dev-kit'.

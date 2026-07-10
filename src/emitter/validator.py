@@ -3,6 +3,11 @@
 `validate_emit(output_dir) -> ValidationReport` checks the 4 emitted files exist
 with the required fields and that plugin.json validates against the vendored
 Codex schema at `docs/codex-plugin.schema.json` (NOT against the live URL).
+
+PR #27 LLM review (🟠 major #4): the four canonical Codex output paths
+were previously duplicated here and in `codex.py`. This module now
+sources them from `src.emitter._shared.layout.CodexLayout` so a future
+fifth file is added in one place.
 """
 
 from __future__ import annotations
@@ -12,6 +17,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import jsonschema
+
+from src.emitter._shared.layout import CodexLayout
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_PATH = REPO_ROOT / "docs" / "codex-plugin.schema.json"
@@ -26,30 +33,51 @@ class ValidationReport:
         return self.ok
 
 
-def _expected_paths(output_dir: Path) -> dict[str, Path]:
-    return {
-        "plugin.json": output_dir / "src" / ".codex-plugin" / "plugin.json",
-        "SKILL.md": output_dir / "src" / "skills",  # directory; specific slug checked later
-        ".mcp.json": output_dir / "src" / ".mcp.json",
-        "README.md": output_dir / "README.md",
-    }
+def _probe_plugin_slug(plugin_json_path: Path) -> str | None:
+    """Read plugin.json enough to know which skill slug to look for.
+
+    Returns None on any failure. The caller collects errors with proper
+    context.
+    """
+    try:
+        payload = json.loads(plugin_json_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    skills = payload.get("skills", [])
+    if isinstance(skills, list) and skills:
+        first = skills[0]
+        if isinstance(first, str):
+            return first
+    return None
 
 
 def validate_emit(output_dir: Path) -> ValidationReport:
     errors: list[str] = []
-
-    # ------------------------------------------------------------ existence
-    expected = _expected_paths(output_dir)
-    plugin_json_path = expected["plugin.json"]
-    mcp_path = expected[".mcp.json"]
-    readme_path = expected["README.md"]
-    skills_root = expected["SKILL.md"]  # directory
 
     # PR #27 review (🔴 critical): each 'missing required file' branch
     # appends to errors and returns ValidationReport(ok=False, ...) so
     # the later stat().st_size and read_text() calls do not raise an
     # uncaught FileNotFoundError. Missing-file reports stay first-class
     # failures; the validator no longer crashes mid-walk.
+
+    # CodexLayout needs a slug. We try to extract it from plugin.json so
+    # the validator can point to `skills/<slug>/SKILL.md` even when
+    # other files are missing. If plugin.json is missing or unreadable,
+    # fall back to a probe slug ("plugin") and let the existence checks
+    # below emit the canonical errors with the right paths.
+    if (output_dir / "src" / ".codex-plugin" / "plugin.json").is_file():
+        slug = _probe_plugin_slug(
+            output_dir / "src" / ".codex-plugin" / "plugin.json"
+        ) or "plugin"
+    else:
+        slug = "plugin"
+    layout = CodexLayout(output_dir=output_dir, plugin_slug=slug)
+
+    plugin_json_path = layout.plugin_json
+    mcp_path = layout.mcp_json
+    readme_path = layout.readme
+    skills_root = layout.skills_root
+
     if not plugin_json_path.is_file():
         errors.append(f"plugin.json missing at {plugin_json_path}")
         return ValidationReport(ok=False, errors=errors)
