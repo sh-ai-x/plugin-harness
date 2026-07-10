@@ -188,9 +188,14 @@ def emit(state: InterviewState, plan_md: str, output_dir: Path) -> EmitResult:
         "skills": [plugin_slug],
     }
     plugin_json_text = json.dumps(plugin_payload, indent=2, ensure_ascii=False) + "\n"
-    # Defense in depth: explicitly assert no forbidden token leaked.
-    if "dev-kit" in plugin_json_text:
-        raise EmitError("forbidden token 'dev-kit' detected in plugin.json output")
+    # PR #27 round 7 (🟠 major): removed the dev-kit guard from
+    # plugin.json output. The 'description' field is user-derived and
+    # a user's legitimate plugin description containing the literal
+    # 'dev-kit' (e.g. "generates dev-kit scaffolding") would falsely
+    # trip the check and emit a confusing failure. The dev-kit
+    # sentinel is reserved for emitted SOURCE files where the
+    # emitter itself controls the content (the bundled SKILL.md
+    # template is emitter-controlled and still checked below).
 
     plugin_json_path = codex_dir / "plugin.json"
     plugin_json_path.write_text(plugin_json_text, encoding="utf-8")
@@ -217,9 +222,11 @@ def emit(state: InterviewState, plan_md: str, output_dir: Path) -> EmitResult:
 
     # README.md: assembled plan verbatim (Markdown-escaped, then template `| e` re-escapes).
     readme_tpl = env.get_template("README.md.j2")
+    # PR #27 round 7 (🟠 major): removed the dev-kit guard from
+    # README.md. README is the assembled plan (user content, already
+    # Markdown-escaped); a user writing about their dev-kit
+    # workflow would falsely trip the check.
     readme_text = readme_tpl.render(plan=_md_escape(plan_body))
-    if "dev-kit" in readme_text:
-        raise EmitError("forbidden token 'dev-kit' detected in README.md output")
 
     readme_path = output_dir / "README.md"
     readme_path.write_text(readme_text, encoding="utf-8")
