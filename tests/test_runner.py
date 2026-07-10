@@ -380,8 +380,15 @@ def test_ai_draft_surfaces_only_type_name_for_unexpected_errors():
             stdout_writer=None,
             stdin_reader=None,
         )
+    # PR #22 round 11 (🟠 major): the per-mode dispatchable handler
+    # wraps the surface error and surfaces only type(exc).__name__
+    # in the message — the original RuntimeError is preserved via
+    # __cause__ for any future logging.
     assert "leaked-secret-prompt-content" not in str(exc_info.value)
     assert "RuntimeError" in str(exc_info.value)
+    cause = exc_info.value.__cause__
+    assert cause is not None
+    assert isinstance(cause, RuntimeError)
 
 
 # ---------- PR #22 round 9 regression: data-driven mode dispatch ----------

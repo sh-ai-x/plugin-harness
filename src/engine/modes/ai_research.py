@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import Optional
 
+from src.engine.errors import InterviewIncompleteError, UserAbortError
+
 from src.engine.runner import ToolSurface
 
 
@@ -64,4 +66,24 @@ __all__ = ["DefaultToolSurface", "make_tool_surface"]
 from src.engine.modes import register_mode
 def _setup_ai_research_mode(_make_reader, _make_writer, make_tool_surface):
     return None, None, make_tool_surface(None)
-register_mode("ai-research", _setup_ai_research_mode)
+
+
+def _ai_research_per_question(question, idea, _stdin_reader, tool_surface):
+    """Per-question handler for the 'ai-research' mode."""
+    if tool_surface is None:
+        raise UserAbortError("ai-research mode requires tool_surface")
+    return _ai_draft_safe(tool_surface, question, idea)
+
+
+def _ai_draft_safe(tool_surface, question, idea):
+    """Wrap _ai_draft with the round-7 error handling."""
+    try:
+        return tool_surface.draft_answer(question=question, idea=idea)
+    except (UserAbortError, KeyboardInterrupt):
+        raise
+    except Exception as exc:
+        raise InterviewIncompleteError(
+            f"tool-surface error while drafting {question['id']!r}: "
+            f"{type(exc).__name__}"
+        ) from exc
+register_mode("ai-research", _ai_research_per_question)

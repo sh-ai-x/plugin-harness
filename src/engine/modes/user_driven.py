@@ -43,4 +43,11 @@ def make_writer(writer: Optional[Callable[[str], None]]) -> Callable[[str], None
 from src.engine.modes import register_mode
 def _setup_user_mode(make_reader, make_writer, _make_tool_surface):
     return make_reader(None), make_writer(None), None
-register_mode("user", _setup_user_mode)
+
+
+def _user_per_question(question, idea, stdin_reader, _tool_surface):
+    """Per-question handler for the 'user' mode."""
+    if stdin_reader is None:
+        raise UserAbortError("user mode requires stdin_reader")
+    return stdin_reader(question["prompt"])
+register_mode("user", _user_per_question)

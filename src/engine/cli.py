@@ -28,7 +28,7 @@ from src.schema.state import InterviewState
 # PR #22 round 8 (major #3): mode list lifted into
 # src/engine/modes/__init__.py as the single source of truth. Import
 # MODES there and use it for argparse choices and validation.
-from src.engine.modes import MODE_DISPATCH, MODES
+from src.engine.modes import MODES
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -38,7 +38,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="subcommand", required=True)
     new_cmd = sub.add_parser("new", help="Start a new interview for an idea.")
-    new_cmd.add_argument("idea", help="One-line description of the plugin idea.")
+    def _idea_value(value: str) -> str:
+        # PR #22 round 11 (🟠 major): wire MAX_IDEA_LENGTH into argparse.
+        # Oversize input exits 2 (invalid args), not 4 (incomplete).
+        if len(value) > MAX_IDEA_LENGTH:
+            raise argparse.ArgumentTypeError(
+                f"--idea exceeds MAX_IDEA_LENGTH={MAX_IDEA_LENGTH} chars"
+            )
+        return value
+
+    new_cmd.add_argument("idea", type=_idea_value, help="One-line description of the plugin idea.")
     new_cmd.add_argument(
         "--mode",
         choices=MODES,
@@ -76,18 +85,23 @@ def main(argv: Optional[List[str]] = None) -> int:
     # Each mode module self-registers a setup callable at import
     # time; cli.py looks it up by name. MODES and MODE_DISPATCH
     # are imported at module top; no need to re-import here.
+    # PR #22 round 11: MODE_DISPATCH is now per-question (used by
+    # runner.py, not cli.py). The CLI layer still constructs
+    # reader/writer/surface here; the per-question handler looks them
+    # up at runtime.
+    from src.engine.modes import MODES
     if args.mode not in MODES:
         _print(f"invalid choice: {args.mode!r} (choose from {MODES})")
-        return 2
-    if args.mode not in MODE_DISPATCH:
-        _print(f"mode {args.mode!r} is not yet wired up at the CLI layer")
         return 2
 
     state = InterviewState()
     writer = make_writer(None)
-    reader, _, tool_surface = MODE_DISPATCH[args.mode](
-        make_reader, make_writer, make_tool_surface
-    )
+    if args.mode == "user":
+        reader = make_reader(None)
+        tool_surface = None
+    else:  # ai-research
+        reader = None
+        tool_surface = make_tool_surface(None)
 
     try:
         run_interview(
