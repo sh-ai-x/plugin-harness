@@ -142,6 +142,9 @@ def _backup_existing(target: Path) -> None:
     ts = _dt.datetime.now().strftime("%Y%m%dT%H%M%S%f")
     backup = target.with_suffix(target.suffix + f".bak.{ts}")
     backup.write_text(target.read_text(encoding="utf-8"), encoding="utf-8")
+    # PR #26 round 9 minor: mirror the A02 fix on the main write so
+    # backups under a permissive umask don't end up world-writable.
+    backup.chmod(0o644)
 
 
 def _atomic_write_text(target: Path, content: str) -> None:

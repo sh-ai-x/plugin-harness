@@ -106,7 +106,10 @@ def test_no_dev_kit_token_in_emitted_skill(tmp_path: Path) -> None:
 
 def test_no_dev_kit_in_adapter_source() -> None:
     """src/adapter/ source MUST NOT contain 'dev-kit' (AC3)."""
-    adapter_dir = Path("src/adapter")
+    # PR #26 round 9 minor: anchor on __file__ so the test runs
+    # from any cwd (not just the repo root).
+    here = Path(__file__).resolve().parent
+    adapter_dir = here.parent / "src" / "adapter"
     assert adapter_dir.is_dir(), "src/adapter/ should exist"
     offenders: list[str] = []
     for path in adapter_dir.rglob("*"):
