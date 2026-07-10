@@ -12,7 +12,7 @@
     {"step": 2, "name": "idea-plan-assembler", "title": "Idea-plan assembler", "status": "pending", "ambiguity_delta": -1.0},
     {"step": 3, "name": "dual-runtime-emitter", "title": "Dual-runtime plugin emitter", "status": "completed", "ambiguity_delta": -2.0, "summary": "Created src/emitter/{codex.py,validator.py,__init__.py}, 4 Jinja2 templates under src/emitter/templates/codex/, tests/test_emitter.py (16 tests pass), and tests/fixtures/sample_state.json. emit() writes the 4 Codex-layout files; validator runs jsonschema against the vendored docs/codex-plugin.schema.json. AC0-AC5 all exit 0."},
     {"step": 4, "name": "cc-adapter", "title": "Claude Code adapter", "status": "completed", "ambiguity_delta": -0.5, "summary": "register_cc installs slash command + skill pointing at src.engine.cli; idempotent; no dev-kit token; 7 pytest cases pass."},
-    {"step": 5, "name": "codex-adapter", "title": "Codex adapter", "status": "pending", "ambiguity_delta": -0.5},
+    {"step": 5, "name": "codex-adapter", "title": "Codex adapter", "status": "completed", "ambiguity_delta": -0.5, "summary": "Added src/adapter/codex.py + SKILL.md at .agents/skills/plugin-harness/SKILL.md (canonical per developers.openai.com/codex/skills), pointing at python -m src.engine.cli; 8 tests pass; idempotent; no 'dev-kit' in src/adapter/."},
     {"step": 6, "name": "e2e-smoke", "title": "E2E test + cross-runtime smoke test", "status": "pending", "ambiguity_delta": 0.0}
   ]
 }
