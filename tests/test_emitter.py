@@ -47,6 +47,7 @@ def completed_state() -> InterviewState:
     state = InterviewState()
     for qid in ALL_QUESTIONS:
         state.set_answer(qid, ("x" * 30))
+        state.advance()  # post-PR #21: set_answer no longer auto-advances
     return state
 
 
@@ -132,8 +133,10 @@ class TestEmit:
         )
         state = InterviewState()
         state.set_answer("what-who-where", evil)
+        state.advance()
         for qid in ("why-this-problem", "how-it-works", "ai-usage", "how-verified"):
             state.set_answer(qid, "x" * 30)
+            state.advance()
         emit(state, "# plan", output_dir)
 
         skill_name = _derive_plugin_name("# plan")
@@ -200,8 +203,10 @@ class TestEmit:
     def test_json_injection_escaped(self, output_dir):
         state = InterviewState()
         state.set_answer("what-who-where", "evil\"json\\break-that-is-very-long")
+        state.advance()
         for qid in ("why-this-problem", "how-it-works", "ai-usage", "how-verified"):
             state.set_answer(qid, "x" * 30)
+            state.advance()
         emit(state, "# plan", output_dir)
         payload = json.loads(
             (output_dir / "src" / ".codex-plugin" / "plugin.json").read_text()
