@@ -141,6 +141,17 @@ class InterviewState:
     def from_dict(cls, payload: dict[str, Any]) -> "InterviewState":
         if not isinstance(payload, dict):
             raise SchemaError(f"payload must be a dict, got {type(payload).__name__}")
+        # PR #21 round 7 (🟠 major): schema_version handshake. to_dict
+        # serializes schema_version=1; previously from_dict ignored it,
+        # so a future v2 payload would silently load as v1 with
+        # `payload.get("answers", {})` returning {} on a renamed key
+        # (data-loss with no error signal). Now reject anything != 1.
+        schema_version = payload.get("schema_version")
+        if schema_version != 1:
+            raise SchemaError(
+                f"unsupported schema_version: {schema_version!r} "
+                f"(expected 1)"
+            )
         raw_answers = payload.get("answers", {})
         if not isinstance(raw_answers, dict):
             raise SchemaError("payload['answers'] must be a dict")
