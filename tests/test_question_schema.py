@@ -89,7 +89,7 @@ def test_question_ids_match_canonical_exactly():
 
 def test_questions_is_list_of_mapping_proxies():
     """Each question dict is wrapped in MappingProxyType (PR #21 round 6)."""
-    assert isinstance(QUESTIONS, list)
+    assert isinstance(QUESTIONS, tuple)  # PR #21 round 8: changed from list to tuple
     assert len(QUESTIONS) > 0
     for q in QUESTIONS:
         as_dict = dict(q)

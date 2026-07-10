@@ -1,14 +1,19 @@
 """Schema package: canonical 5-question interview schema + InterviewState runtime.
 
-PR #21 round 5: drop QUESTIONS from the public API; it is a
-mutable singleton. Callers should use canonical_ids() to enumerate
-or get_question(qid) to fetch by id. MappingProxyType freezes the
-list at the package boundary so callers can't append/remove questions
-through `src.schema.QUESTIONS.append(...)` and corrupt the canonical
-schema.
+Public API:
+  - `canonical_ids()` — read-only sequence of question ids in canonical order
+  - `get_question(qid)` — fetch a question dict by id
+  - `InterviewState` — runtime carrier with cursor + answers + validation
+  - `SchemaError`, `ValidationError` — typed exceptions
+  - `QUESTIONS` — frozen tuple of MappingProxyType entries (deep-immutable)
 
-PR #21 round 7: collapsed the previous duplicate __all__ blocks into
-a single declaration after the .state import.
+PR #21 round 5: deep-freeze the inner question dicts so callers
+cannot mutate QUESTIONS[i][...] to disable the round-3 DoS caps.
+PR #21 round 7: collapsed duplicate __all__ blocks into a single
+declaration after the .state import.
+PR #21 round 8: QUESTIONS is now a tuple at the source (questions.py)
+so the import-time _CANONICAL_IDS / _QUESTION_BY_ID caches cannot
+desync from QUESTIONS at runtime.
 """
 from .questions import QUESTIONS as _QUESTIONS  # noqa: F401  (re-exported as tuple)
 from .questions import canonical_ids, get_question  # noqa: F401  (public API)
