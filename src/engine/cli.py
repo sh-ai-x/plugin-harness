@@ -28,7 +28,7 @@ from src.schema.state import InterviewState
 # PR #22 round 8 (major #3): mode list lifted into
 # src/engine/modes/__init__.py as the single source of truth. Import
 # MODES there and use it for argparse choices and validation.
-from src.engine.modes import MODES as VALID_MODES
+from src.engine.modes import MODE_DISPATCH, MODES
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -41,7 +41,7 @@ def build_parser() -> argparse.ArgumentParser:
     new_cmd.add_argument("idea", help="One-line description of the plugin idea.")
     new_cmd.add_argument(
         "--mode",
-        choices=VALID_MODES,
+        choices=MODES,
         default="user",
         help="Interview mode: 'user' (stdin) or 'ai-research' (tool surface).",
     )
@@ -74,8 +74,8 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     # PR #22 round 9 (🟠 major): data-driven dispatch via MODE_DISPATCH.
     # Each mode module self-registers a setup callable at import
-    # time; cli.py looks it up by name.
-    from src.engine.modes import MODES, MODE_DISPATCH
+    # time; cli.py looks it up by name. MODES and MODE_DISPATCH
+    # are imported at module top; no need to re-import here.
     if args.mode not in MODES:
         _print(f"invalid choice: {args.mode!r} (choose from {MODES})")
         return 2
