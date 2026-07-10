@@ -53,7 +53,7 @@ def test_skill_matches_bundled_reference() -> None:
     byte-identical copy (PR #26 round 7).
     """
     from importlib import resources
-    from src.adapter import codex_skills  # type: ignore[import-not-found]
+    from src.adapter import codex_skills  # PR #26 round 12: codex_skills/ now has __init__.py at every level; no # type: ignore needed.
     try:
         bundled = (
             resources.files("src.adapter.codex_skills.plugin-harness")
