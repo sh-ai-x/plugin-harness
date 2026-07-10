@@ -1,0 +1,9 @@
+{# Codex plugin manifest. The emitter pre-builds this dict and uses
+   json.dumps for transport-escape (NOT this template). Template kept for
+   future fields that need value substitution. #}
+{
+  "name": "{{ plugin_name }}",
+  "version": "{{ version }}",
+  "description": "{{ description }}",
+  "skills": ["{{ plugin_slug }}"]
+}
