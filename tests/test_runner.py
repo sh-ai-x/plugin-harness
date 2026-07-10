@@ -442,3 +442,25 @@ def test_default_tool_surface_clamps_to_max_length():
         assert len(out) <= q["max_length"], (
             f"DefaultToolSurface output {len(out)} > max_length {q['max_length']}"
         )
+
+
+def test_run_interview_rejects_missing_stdin_reader_for_user_mode():
+    """PR #22 round 12: missing stdin_reader for 'user' mode now raises ValueError
+    BEFORE the first prompt is emitted, mapping to exit 2 (programming
+    error) rather than mid-interview UserAbortError → exit 3.
+    """
+    from src.engine.runner import run_interview, InterviewState
+    state = InterviewState()
+    with pytest.raises(ValueError, match="'user' mode requires stdin_reader"):
+        run_interview(state, mode="user", idea="x",
+                     stdin_reader=None, stdout_writer=None)
+
+
+def test_run_interview_rejects_missing_tool_surface_for_ai_research_mode():
+    """PR #22 round 12: same for ai-research."""
+    from src.engine.runner import run_interview, InterviewState
+    state = InterviewState()
+    with pytest.raises(ValueError, match="'ai-research' mode requires tool_surface"):
+        run_interview(state, mode="ai-research", idea="x",
+                     stdin_reader=None, stdout_writer=None,
+                     tool_surface=None)
