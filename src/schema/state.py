@@ -125,9 +125,6 @@ class InterviewState:
         # unbounded, callers must explicitly set max_length to math.inf.
         return question["min_length"] <= n <= question["max_length"]
 
-    # ---- (de)serialization) ----
-
-    # ---- (de)serialization ----
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -194,6 +191,17 @@ class InterviewState:
             if idx > max_answered_idx:
                 max_answered_idx = idx
         cursor = payload.get("cursor")
+        # PR #21 round 8 (🟠 major): reject non-int cursors with an
+        # explicit SchemaError. Previously a non-int cursor (e.g. a
+        # string or float) silently fell through to the canonical_ids
+        # walk in the else branch, masking a programming error as
+        # a valid first-unanswered cursor.
+        if cursor is not None and (
+            type(cursor) is not int or isinstance(cursor, bool)
+        ):
+            raise SchemaError(
+                f"cursor must be an int, got {type(cursor).__name__}: {cursor!r}"
+            )
         if type(cursor) is int and not isinstance(cursor, bool) and cursor >= 0:
             # Caller cursor must not exceed the highest answered index + 1;
             # otherwise the state is unreachable-by-construction.

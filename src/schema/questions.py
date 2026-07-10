@@ -28,7 +28,13 @@ def _freeze(q: dict[str, Any]) -> MappingProxyType:
     return MappingProxyType(q)
 
 
-QUESTIONS: list[MappingProxyType] = [
+# PR #21 round 8: change QUESTIONS from list to tuple. The package
+# boundary was previously wrapping a mutable list in a tuple
+# (round 5), but the module-level QUESTIONS was still a list —
+# callers importing from src.schema.questions could append to it.
+# Now QUESTIONS is itself a tuple, so import-time _CANONICAL_IDS /
+# _QUESTION_BY_ID caches cannot desync from QUESTIONS at runtime.
+QUESTIONS: tuple[MappingProxyType, ...] = (
     _freeze({
         "id": "what-who-where",
         "prompt": "무엇을, 누가, 어떤 상황에서 쓰나요?",
@@ -74,7 +80,7 @@ QUESTIONS: list[MappingProxyType] = [
         "max_length": DEFAULT_MAX_LENGTH,
         "validation_hint": "20자 이상 — 테스트/시나리오/수동 검증 방법",
     }),
-]
+)
 
 
 _CANONICAL_IDS: tuple[str, ...] = tuple(q["id"] for q in QUESTIONS)

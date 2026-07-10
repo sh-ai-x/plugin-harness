@@ -64,12 +64,14 @@ def test_is_complete_false_when_only_some_answered():
 def test_from_dict_rejects_bool_cursor():
     """Regression: in Python, `isinstance(True, int)` is True (bool subclasses int).
     A payload like `{"cursor": true}` would otherwise silently set _cursor = 1
-    and skip question 0 on round-trip. The fix uses `type(cursor) is int and
-    not isinstance(cursor, bool)` to reject the bool-as-int subclass case.
+    and skip question 0 on round-trip.
+
+    PR #21 round 8: bool is now explicitly rejected with SchemaError
+    (`cursor must be an int, got bool: True`) instead of silently
+    falling through to the canonical_ids walk. Tightens the contract.
     """
-    s = InterviewState.from_dict({"schema_version": 1, "cursor": True, "answers": {}})
-    # cursor must default to 0 (the derive path), not silently advance to 1.
-    assert s.current_question() == QUESTIONS[0]
+    with pytest.raises(SchemaError, match=r"cursor must be an int"):
+        InterviewState.from_dict({"schema_version": 1, "cursor": True, "answers": {}})
 
 def test_set_answer_rejects_unknown_question_id():
     s = InterviewState()
