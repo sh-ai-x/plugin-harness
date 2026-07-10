@@ -553,12 +553,12 @@ jobs:
 
       - name: Combined verdict gate
         run: |
-          # PR #30.1 (root-cause fix): extract verdicts at gate time, not
-          # from job outputs. The review/security extract step runs
-          # immediately when the job starts, BEFORE the LLM has posted
-          its verdict comment — so job outputs capture stale verdicts.
-          # The gate runs AFTER both jobs complete, so any newly
-          # posted comments are visible. We extract here directly.
+          # PR #30.1 (root-cause fix): extract verdicts at gate time,
+          # not from job outputs. The review/security extract step
+          # runs immediately when the job starts, BEFORE the LLM has
+          # posted its verdict comment, so job outputs capture stale
+          # verdicts. The gate runs AFTER both jobs complete, so any
+          # newly posted comments are visible. Extract here.
           EVENT="$EVENT_NAME"
           R="$(gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
             --jq '.[] | select((.user.login // "") | startswith("claude")) | .body' \
