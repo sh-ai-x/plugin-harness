@@ -67,7 +67,7 @@ def test_from_dict_rejects_bool_cursor():
     and skip question 0 on round-trip. The fix uses `type(cursor) is int and
     not isinstance(cursor, bool)` to reject the bool-as-int subclass case.
     """
-    s = InterviewState.from_dict({"cursor": True, "answers": {}})
+    s = InterviewState.from_dict({"schema_version": 1, "cursor": True, "answers": {}})
     # cursor must default to 0 (the derive path), not silently advance to 1.
     assert s.current_question() == QUESTIONS[0]
 
@@ -200,6 +200,7 @@ def test_from_dict_cursor_walks_canonical_on_out_of_order_answers():
     canonical_ids() to the first unanswered question.
     """
     s = InterviewState.from_dict({
+        "schema_version": 1,
         "answers": {
             "how-verified": "x" * 30,  # idx 4
             "what-who-where": "y" * 30,  # idx 0
@@ -248,6 +249,7 @@ def test_from_dict_atomic_on_partial_validation_failure():
     too_short = "x" * 5
     with pytest.raises(ValidationError):
         InterviewState.from_dict({
+            "schema_version": 1,
             "answers": {
                 "what-who-where": _valid_answer("what-who-where"),
                 "why-this-problem": too_short,  # < min_length
@@ -265,6 +267,7 @@ def test_from_dict_atomic_on_partial_validation_failure():
 def test_from_dict_rejects_cursor_that_desyncs_from_answered():
     """🟠 major (A06-3): caller cursor > max(answered)+1 is clamped."""
     s = InterviewState.from_dict({
+        "schema_version": 1,
         "cursor": 4,  # claims Q4 is next, but only Q0-Q2 answered
         "answers": {
             "what-who-where": _valid_answer("what-who-where"),
@@ -288,6 +291,7 @@ def test_from_dict_enforces_per_question_max_length():
     """
     with pytest.raises(ValidationError, match="fails validation"):
         InterviewState.from_dict({
+            "schema_version": 1,
             "answers": {
                 qid: "x" * (DEFAULT_MAX_LENGTH + 1)  # 1 over per-q cap
                 for qid in ["what-who-where", "why-this-problem", "how-it-works", "ai-usage", "how-verified"]
@@ -335,7 +339,7 @@ def test_from_dict_rejects_negative_cursor():
     """🟠 major: cursor < 0 silently reset the interview to start. Now
     raises SchemaError."""
     with pytest.raises(SchemaError, match="cursor must be non-negative"):
-        InterviewState.from_dict({"cursor": -1, "answers": {}})
+        InterviewState.from_dict({"schema_version": 1, "cursor": -1, "answers": {}})
 
 
 def test_deep_freeze_questions_blocks_mutation():
@@ -347,3 +351,29 @@ def test_deep_freeze_questions_blocks_mutation():
     for q in QUESTIONS:
         with pytest.raises(TypeError, match="does not support item assignment"):
             q["max_length"] = 10**9
+
+
+# ---------- PR #21 round 7 regression: schema_version handshake ----------
+def test_from_dict_rejects_unsupported_schema_version():
+    """🟠 major (round 7): from_dict must reject any payload whose
+    schema_version is != 1, instead of silently treating a future v2
+    payload as v1 (which silently produced an empty state with the
+    answers key renamed)."""
+    with pytest.raises(SchemaError, match="unsupported schema_version"):
+        InterviewState.from_dict({"schema_version": 2, "answers": {}})
+    with pytest.raises(SchemaError, match="unsupported schema_version"):
+        InterviewState.from_dict({"schema_version": None, "answers": {}})
+    # Missing schema_version field
+    with pytest.raises(SchemaError, match="unsupported schema_version"):
+        InterviewState.from_dict({"answers": {}})
+
+
+def test_from_dict_accepts_schema_version_1():
+    """The handshake must NOT reject schema_version=1 (positive case)."""
+    state = InterviewState.from_dict({
+        "schema_version": 1,
+        "answers": {
+            qid: _valid_answer(qid) for qid in [q["id"] for q in QUESTIONS]
+        },
+    })
+    assert state.is_complete()
