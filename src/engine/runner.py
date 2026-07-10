@@ -75,6 +75,16 @@ def run_interview(
     if mode not in MODES:
         raise ValueError(f"unknown mode {mode!r}; expected 'user' or 'ai-research'")
 
+    # PR #22 round 12 (🟡 minor): validate per-mode dependencies BEFORE
+    # any prompt is emitted. The per-question dispatch raises
+    # UserAbortError → exit 3 if a dep is missing, but emitting the
+    # first prompt and only then failing would be confusing. Use typed
+    # ValueError → exit 2 (programming error, not user input).
+    if mode == "user" and stdin_reader is None:
+        raise ValueError("'user' mode requires stdin_reader")
+    if mode == "ai-research" and tool_surface is None:
+        raise ValueError("'ai-research' mode requires tool_surface")
+
     for question in QUESTIONS:
         _prompt(question, stdout_writer)
 
