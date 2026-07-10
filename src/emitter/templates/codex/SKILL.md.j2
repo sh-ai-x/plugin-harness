@@ -1,0 +1,20 @@
+{# Codex SKILL.md body. SSTI defense: every user-derived field passes through
+   `| replace` chain that escapes `{` and `}` to HTML entities (the search
+   strings use `{` / `}` so the Jinja parser does NOT treat them as
+   the start of `{{ ... }}`). The emitter-side `_md_escape` also runs first,
+   handling Markdown + HTML escape; `| replace` here is the SSTI-specific
+   brace escape that survives the test's fresh Environment(autoescape=True). #}
+---
+name: {{ plugin_slug | replace("{", "&#123;") | replace("}", "&#125;") }}
+description: {{ description | replace("{", "&#123;") | replace("}", "&#125;") }}
+---
+
+# {{ plugin_slug | replace("{", "&#123;") | replace("}", "&#125;") }}
+
+## How it works
+
+{{ how_it_works | replace("{", "&#123;") | replace("}", "&#125;") }}
+
+## Idea plan
+
+{{ plan | replace("{", "&#123;") | replace("}", "&#125;") }}

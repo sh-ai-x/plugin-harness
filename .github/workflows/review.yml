@@ -289,9 +289,14 @@ jobs:
             echo "verdict=Approve" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          # PR #28 (root-cause fix): pick the LATEST claude[bot] comment
+          # verdict, not the oldest. gh api returns comments in
+          # chronological order (oldest first); `tail -1` selects the
+          # most recent. After every re-review the LLM posts a new
+          # Verdict line, so tail -1 reflects the latest review.
           verdict="$(gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
             --jq '.[] | select((.user.login // "") | startswith("claude")) | .body' \
-            | grep -E 'Verdict: (Approve|Blocked|Changes Requested)' | head -1 \
+            | grep -E 'Verdict: (Approve|Blocked|Changes Requested)' | tail -1 \
             | grep -oE 'Verdict:[[:space:]]*(Approve|Blocked|Changes Requested)' \
             | sed -E 's/.*Verdict:[[:space:]]*//' || true)"
           echo "review_verdict=${verdict:-<none>}"
@@ -508,9 +513,14 @@ jobs:
             echo "verdict=Approve" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          # PR #28 (root-cause fix): pick the LATEST claude[bot] comment
+          # verdict, not the oldest. gh api returns comments in
+          # chronological order (oldest first); `tail -1` selects the
+          # most recent. After every re-review the LLM posts a new
+          # Verdict line, so tail -1 reflects the latest review.
           verdict="$(gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
             --jq '.[] | select((.user.login // "") | startswith("claude")) | .body' \
-            | grep -E 'Verdict: (Approve|Blocked|Changes Requested)' | head -1 \
+            | grep -E 'Verdict: (Approve|Blocked|Changes Requested)' | tail -1 \
             | grep -oE 'Verdict:[[:space:]]*(Approve|Blocked|Changes Requested)' \
             | sed -E 's/.*Verdict:[[:space:]]*//' || true)"
           echo "security_verdict=${verdict:-<none>}"
