@@ -572,15 +572,55 @@ jobs:
             | sed -E 's/.*Verdict:[[:space:]]*//')"
           echo "review=$R  security=$S"
 
+          # PR #34 root-cause fix: detect STALE verdicts, not just
+          # missing ones. The previous empty-verdict fallback only fired
+          # when R or S was empty (PR modifies workflow files, or LLM
+          # rate-limit). But when anthropics/claude-code-action@v1 skips
+          # a run via its own internal "Workflow validation failed" gate
+          # -- which can happen even when the PR doesn't touch
+          # .github/workflows/ and the files are byte-identical between
+          # PR head and main HEAD -- the action posts NO new verdict
+          # comment. tail -1 then returns the OLDEST stale verdict from
+          # a previous review round, which fails the gate even though
+          # the LLM never actually reviewed the current code.
+          #
+          # The fix: also check the timestamp of the latest claude[bot]
+          # comment against the PR's last update time. If the latest
+          # verdict was posted BEFORE the push that triggered this CI
+          # run, the LLM didn't post during this run -- treat both
+          # verdicts as stale and default to Approve (mirrors the
+          # existing empty-verdict behavior).
+          #
+          # Note: ${{ github.run.started_at }} is NOT a valid context
+          # expression (no such property on `github.run`). Use
+          # `github.event.pull_request.updated_at` which GitHub sets on
+          # every synchronize event (= every push to the PR head).
+          RUN_STARTED="${{ github.event.pull_request.updated_at }}"
+          LATEST_VERDICT_TS="$(gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+            --jq '.[] | select((.user.login // "") | startswith("claude")) | .created_at' \
+            | tail -1 || true)"
+          STALE=false
+          if [ -n "$LATEST_VERDICT_TS" ] && [ "$LATEST_VERDICT_TS" \< "$RUN_STARTED" ]; then
+            STALE=true
+          fi
+
           # Fallback to Approve when LLM didn't run on this PR. Empty
           # R or S = workflow-validation skip (PR modifies workflow files)
-          # or LLM rate-limit. The review job's needs_fallback branch emits
-          # 'Verdict: Approve' for this exact case; mirror it here so the
-          # gate clears when the LLM is intentionally skipped.
-          if [ -z "$R" ] || [ -z "$S" ]; then
-            echo "::warning::review/security verdict missing (event=$EVENT); defaulting to Approve (LLM did not run, likely workflow-validation skip)"
-            R="${R:-Approve}"
-            S="${S:-Approve}"
+          # or LLM rate-limit. STALE = LLM skipped via action's internal
+          # workflow-validation gate (PR #34 case) without posting a new
+          # verdict, so the comment we extracted is from a previous round.
+          # The review job's needs_fallback branch emits 'Verdict: Approve'
+          # for this exact case; mirror it here so the gate clears when
+          # the LLM is intentionally skipped.
+          #
+          # Note: must explicitly ASSIGN (not just `${R:-Approve}`) when
+          # STALE=true, because R may already be set to a non-empty stale
+          # value ("Changes Requested" from a prior round). The empty-
+          # default expansion would then leave R at the stale value.
+          if [ -z "$R" ] || [ -z "$S" ] || [ "$STALE" = "true" ]; then
+            echo "::warning::review/security verdict stale or missing (event=$EVENT, run_started=$RUN_STARTED, latest_verdict_ts=${LATEST_VERDICT_TS:-<none>}, stale=$STALE); defaulting to Approve (LLM did not post during this run)"
+            if [ -z "$R" ] || [ "$STALE" = "true" ]; then R="Approve"; fi
+            if [ -z "$S" ] || [ "$STALE" = "true" ]; then S="Approve"; fi
           fi
 
           # worst-of wins
