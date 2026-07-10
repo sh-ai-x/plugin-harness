@@ -328,3 +328,22 @@ def test_current_question_returns_none_past_end():
         s.advance()
     assert s.is_complete() is True
     assert s.current_question() is None
+
+
+# ---------- PR #21 round 6 regression: symmetric cursor clamp ----------
+def test_from_dict_rejects_negative_cursor():
+    """🟠 major: cursor < 0 silently reset the interview to start. Now
+    raises SchemaError."""
+    with pytest.raises(SchemaError, match="cursor must be non-negative"):
+        InterviewState.from_dict({"cursor": -1, "answers": {}})
+
+
+def test_deep_freeze_questions_blocks_mutation():
+    """🟠 major: PR #21 round 6 deep-freezes each question dict via
+    MappingProxyType so callers cannot mutate a question via
+    QUESTIONS[i]['max_length'] = 10**9 to silently disable the DoS cap.
+    """
+    from src.schema.questions import QUESTIONS
+    for q in QUESTIONS:
+        with pytest.raises(TypeError, match="does not support item assignment"):
+            q["max_length"] = 10**9

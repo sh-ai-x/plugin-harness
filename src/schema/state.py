@@ -118,7 +118,12 @@ class InterviewState:
         if not isinstance(value, str):
             return False
         n = len(value)
-        return question["min_length"] <= n <= question.get("max_length", float("inf"))
+        # PR #21 round 6 (🟠 major): strict max_length lookup.
+        # The previous .get(..., inf) silently bypassed the round-3 DoS
+        # cap when a question dict omitted max_length. Now KeyError → the
+        # caller raises a clear ValidationError. To make a question
+        # unbounded, callers must explicitly set max_length to math.inf.
+        return question["min_length"] <= n <= question["max_length"]
 
     # ---- (de)serialization) ----
 
@@ -181,9 +186,31 @@ class InterviewState:
         if type(cursor) is int and not isinstance(cursor, bool) and cursor >= 0:
             # Caller cursor must not exceed the highest answered index + 1;
             # otherwise the state is unreachable-by-construction.
+            # PR #21 round 6 (🟠 major): symmetric cursor clamp with
+            # lower bound. Previously cursor could be < 0 (silently
+            # resetting the interview to start) or > len(QUESTIONS)
+            # (producing an unreachable-by-construction state).
+            if cursor < 0:
+                raise SchemaError(
+                    f"cursor must be non-negative, got {cursor}"
+                )
+            if cursor > len(QUESTIONS):
+                raise SchemaError(
+                    f"cursor {cursor} exceeds len(QUESTIONS)={len(QUESTIONS)}"
+                )
+            # Upper bound: cursor may not exceed max_answered_idx+1
+            # (otherwise the state would be unreachable-by-construction).
             state_cursor = min(cursor, max_answered_idx + 1, len(QUESTIONS))
             state._cursor = state_cursor
         else:
+            # PR #21 round 6 (🟠 major): even when the caller doesn't
+            # supply a cursor, validate cursor parity (caller used the
+            # boolean-false branch which is correct, but a non-int cursor
+            # value like -1 in the JSON must still be rejected).
+            if isinstance(cursor, int) and cursor < 0:
+                raise SchemaError(
+                    f"cursor must be non-negative, got {cursor}"
+                )
             # No caller cursor: walk canonical_ids() to the first
             # unanswered question. PR #21 round-2 fix; preserves the
             # round-trip semantics where a re-loaded state prompts for

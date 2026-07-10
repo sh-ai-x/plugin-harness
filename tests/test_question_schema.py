@@ -16,12 +16,6 @@ CANONICAL_IDS = (
 )
 
 
-def test_questions_is_list_of_dicts():
-    assert isinstance(QUESTIONS, list)
-    assert len(QUESTIONS) > 0
-    assert all(isinstance(q, dict) for q in QUESTIONS)
-
-
 def test_questions_count_is_five():
     assert len(QUESTIONS) == 5
 
@@ -92,3 +86,12 @@ def test_question_ids_match_canonical_exactly():
     assert set(ids) == set(CANONICAL_IDS), (
         f"schema ids {ids!r} must match canonical set {CANONICAL_IDS!r}"
     )
+
+def test_questions_is_list_of_mapping_proxies():
+    """Each question dict is wrapped in MappingProxyType (PR #21 round 6)."""
+    assert isinstance(QUESTIONS, list)
+    assert len(QUESTIONS) > 0
+    for q in QUESTIONS:
+        as_dict = dict(q)
+        assert "id" in as_dict
+        assert "max_length" in as_dict
