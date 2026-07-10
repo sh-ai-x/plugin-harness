@@ -72,6 +72,12 @@ def _derive_plugin_name(plan_md: str) -> str:
     if not re.match(r"^[a-z0-9]", kebab):
         kebab = "p-" + kebab
         kebab = kebab[:64].strip("-")
+    # PR #27 round 8 (🟠 major): enforce 2-char minimum so the result
+    # matches the vendored schema pattern `^[a-z0-9][a-z0-9-]{1,63}$`
+    # (2-64 chars, starts alphanumeric). A 1-char kebab (e.g. 'p-a')
+    # survives the alpha-prefix check but fails the length minimum.
+    if len(kebab) < 2:
+        kebab = "plugin"
     return kebab or "plugin"
 
 
@@ -174,6 +180,15 @@ def emit(state: InterviewState, plan_md: str, output_dir: Path) -> EmitResult:
     # SSTI defense still holds because user text reaches the template as a
     # Python value (not as template source) — Jinja will not re-evaluate
     # `{{ user_text }}` inside the value.
+    # PR #27 review A05 (🟡 minor): SSTI defense-in-depth. The reviewer's
+    # recommendation was autoescape=True, but enabling autoescape breaks
+    # the existing test_markdown_injection_escaped assertion (which expects
+    # the specific backslash-greater Markdown-blockquote escape, not
+    # Jinja2's HTML entity escape &gt;). Switching to autoescape would
+    # require changing the test contract; deferring. SSTI defense
+    # continues to rely on the per-template replace chain in
+    # SKILL.md.j2 (replace open-brace with &#123; etc.) — the same
+    # primary defense the reviewer accepted as workable.
     env = Environment(
         loader=FileSystemLoader(str(TEMPLATES_DIR)),
         autoescape=False,
