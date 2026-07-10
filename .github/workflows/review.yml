@@ -553,12 +553,23 @@ jobs:
 
       - name: Combined verdict gate
         run: |
-          # Read verdicts directly from each job's outputs (set by the
-          # 'Extract <skill> verdict' post-step in review + security jobs).
-          # This is robust: no fragile comment-body matching required.
-          R="${{ needs.review.outputs.verdict }}"
-          S="${{ needs.security.outputs.verdict }}"
+          # PR #30.1 (root-cause fix): extract verdicts at gate time, not
+          # from job outputs. The review/security extract step runs
+          # immediately when the job starts, BEFORE the LLM has posted
+          its verdict comment — so job outputs capture stale verdicts.
+          # The gate runs AFTER both jobs complete, so any newly
+          # posted comments are visible. We extract here directly.
           EVENT="$EVENT_NAME"
+          R="$(gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+            --jq '.[] | select((.user.login // "") | startswith("claude")) | .body' \
+            | grep -E 'Verdict: (Approve|Blocked|Changes Requested)' | tail -1 \
+            | grep -oE 'Verdict:[[:space:]]*(Approve|Blocked|Changes Requested)' \
+            | sed -E 's/.*Verdict:[[:space:]]*//')"
+          S="$(gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+            --jq '.[] | select((.user.login // "") | startswith("claude")) | .body' \
+            | grep -E 'Verdict: (Approve|Blocked|Changes Requested)' | tail -1 \
+            | grep -oE 'Verdict:[[:space:]]*(Approve|Blocked|Changes Requested)' \
+            | sed -E 's/.*Verdict:[[:space:]]*//')"
           echo "review=$R  security=$S"
 
           # HARD FAIL on missing verdict. Empty R or S means the LLM did not
