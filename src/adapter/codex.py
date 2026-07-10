@@ -104,7 +104,7 @@ def register_codex(project_dir: Path) -> Path:
 
 
 def _refuse_if_symlink_chain(target: Path, project_root: Path) -> None:
-    """Refuse the install if `target` or any parent UNDER `project_root` is a symlink.
+    """Refuse the install if any path STRICTLY BELOW `project_root` is a symlink.
 
     Defense-in-depth: an attacker who pre-plants the project tree or
     any path under the install root as a symlink can otherwise divert
@@ -113,21 +113,21 @@ def _refuse_if_symlink_chain(target: Path, project_root: Path) -> None:
     rename target on POSIX, so checking the chain here is
     belt-and-suspenders.
 
-    Walks every ancestor from `target` up to and including
-    `project_root`. macOS exposes /var -> /private/var, /tmp -> /private/tmp,
-    etc. — those symlinks live ABOVE the project root and are not
-    attacker-controlled, so the walk stops at `project_root` rather
-    than walking all the way up to /
-    (PR #26 round 7: previous hardcoded parents[2] silently missed
-    project_dir itself being a symlink).
+    Walks ancestors from `target` up to but EXCLUDING `project_root`.
+    macOS exposes /var -> /private/var, /tmp -> /private/tmp, etc. —
+    those symlinks live at the project root (caller passes
+    `/tmp` as the project_dir on macOS, for example). The check
+    must NOT fire on the project_root itself, only on paths below
+    it (PR #26 round 8: previous code rejected legitimate installs
+    when the caller passed a system-symlinked project_dir).
     """
     for path in (target, *target.parents):
+        if path == project_root:
+            break  # don't check project_root itself
         if path.is_symlink():
             raise FileExistsError(
                 f"refusing to write through symlink: {path}"
             )
-        if path == project_root:
-            break
 
 
 def _backup_existing(target: Path) -> None:

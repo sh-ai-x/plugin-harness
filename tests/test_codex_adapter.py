@@ -20,11 +20,6 @@ from src.adapter.codex import register_codex
 
 
 CODEX_SKILL_PATH = Path(".agents/skills/plugin-harness/SKILL.md")
-EXPECTED_FIXTURE = Path(
-    "tests/fixtures/codex_install/expected/.agents/skills/plugin-harness/SKILL.md"
-)
-
-
 def test_register_codex_creates_skill_file() -> None:
     """register_codex MUST create the Codex skill at the expected path."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -52,9 +47,10 @@ def test_skill_matches_bundled_reference() -> None:
     """Emitted SKILL.md matches the bundled reference resolved at test
     time via importlib.resources — no on-disk fixture drift (PR #26
     round 7 🟠 major: previous test_skill_matches_expected_fixture
-    compared against tests/fixtures/codex_install/expected/.../SKILL.md,
-    which was a byte-identical copy of the bundled source and so
-    could never detect drift between the two).
+    compared against the bundled source resolved at test time via
+    importlib.resources (with editable-install fallback), so the
+    test pins against the real reference rather than a checked-in
+    byte-identical copy (PR #26 round 7).
     """
     from importlib import resources
     from src.adapter import codex_skills  # type: ignore[import-not-found]
