@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from typing import Any, Callable, Optional
-from typing import Protocol
 
 # PR #22 review (🟠 major): ToolSurface was previously `Any`, which
 # discarded the contract. ai-research calls
@@ -10,13 +9,11 @@ from typing import Protocol
 # docstring + FakeToolSurface in tests must agree on the same
 # keyword-only signature. Promote to a runtime.Protocol so callers
 # can type-check without forcing a subclassing dependency.
-class ToolSurface(Protocol):
-    def draft_answer(self, *, question: dict, idea: str) -> str:
-        """Draft an answer to one interview question.
-
-        Keyword-only signature: callers (the runner) and fakes (the
-        tests) must agree. Returns the answer as a string.
-        """
+# PR #22 round 12 (🟠 major): the Protocol now lives in
+# src/engine/errors.py so modes can import it without depending on
+# the orchestrator. Re-exported here for backward compatibility with
+# any direct runner.ToolSurface importer.
+from src.engine.errors import InterviewIncompleteError, ToolSurface  # noqa: F401
 
 from src.schema.questions import QUESTIONS
 from src.schema.state import InterviewState, SchemaError, ValidationError
@@ -29,7 +26,8 @@ StdoutWriter = Callable[[str], None]
 # PR #22 round 8: UserAbortError and InterviewIncompleteError moved
 # to src/engine/errors.py. Re-exported here for backward compatibility
 # with cli.py and modes/*. The canonical home is src.engine.errors.
-from src.engine.errors import InterviewIncompleteError, UserAbortError  # noqa: F401
+from src.engine.errors import InterviewIncompleteError, UserAbortError  # noqa: F401  # re-export
+from src.engine.errors import ToolSurface  # noqa: F401  # re-export (canonical home)
 
 
 # PR #22 round 8/9: cap on the `idea` parameter. CLI layer caps at

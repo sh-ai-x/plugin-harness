@@ -2,16 +2,14 @@
 
 The tool surface is injected at the CLI layer. It must expose
 `draft_answer(*, question, idea) -> str` (keyword-only, matching the
-`ToolSurface` Protocol in runner.py) and may additionally use web_search /
+`ToolSurface` Protocol in errors.py) and may additionally use web_search /
 web_fetch to gather material before drafting. This module itself performs no I/O.
 """
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
-from src.engine.errors import InterviewIncompleteError, UserAbortError
-
-from src.engine.runner import ToolSurface
+from src.engine.errors import InterviewIncompleteError, ToolSurface, UserAbortError
 
 
 class DefaultToolSurface:
@@ -63,9 +61,17 @@ def is_default_surface(surface: Any) -> bool:
 __all__ = ["DefaultToolSurface", "make_tool_surface"]
 
 # PR #22 round 9: register this mode's setup with the dispatch table.
-from src.engine.modes import register_mode
+# PR #22 round 12 (🟠 major #3): also register the tool-surface factory
+# so cli.py looks it up via src.engine.modes.setup_surface() instead of
+# importing make_tool_surface directly. ai-research does not use stdin
+# — register a no-op so cli.py can call setup_reader("ai-research")
+# uniformly without branching on the mode name.
+from src.engine.modes import register_mode, register_reader, register_surface
 def _setup_ai_research_mode(_make_reader, _make_writer, make_tool_surface):
     return None, None, make_tool_surface(None)
+
+register_surface("ai-research", make_tool_surface)
+register_reader("ai-research", lambda override: None)
 
 
 def _ai_research_per_question(question, idea, _stdin_reader, tool_surface):

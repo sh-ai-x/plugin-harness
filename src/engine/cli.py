@@ -15,8 +15,6 @@ import argparse
 import sys
 from typing import List, Optional
 
-from src.engine.modes.ai_research import make_tool_surface
-from src.engine.modes.user_driven import make_reader, make_writer
 from src.engine.runner import (
     InterviewIncompleteError,
     UserAbortError,
@@ -28,7 +26,16 @@ from src.schema.state import InterviewState
 # PR #22 round 8 (major #3): mode list lifted into
 # src/engine/modes/__init__.py as the single source of truth. Import
 # MODES there and use it for argparse choices and validation.
-from src.engine.modes import MODES
+# PR #22 round 12 (🟠 major #3): per-mode reader + tool-surface
+# factories are also looked up through the registry. cli.py no longer
+# imports `make_reader` / `make_tool_surface` directly from per-mode
+# modules — adding a third mode requires no changes here.
+from src.engine.modes import (
+    MODES,
+    setup_reader,
+    setup_surface,
+)
+from src.engine.modes.user_driven import make_writer  # writer is shared across modes
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -89,19 +96,18 @@ def main(argv: Optional[List[str]] = None) -> int:
     # runner.py, not cli.py). The CLI layer still constructs
     # reader/writer/surface here; the per-question handler looks them
     # up at runtime.
-    from src.engine.modes import MODES
+    # PR #22 round 12 (🟠 major #2 + #3): per-mode reader and
+    # tool-surface factories are looked up via src.engine.modes. The
+    # `if args.mode == "user": ... else: ...` hardcoded branch is
+    # gone — adding a third mode requires no changes here.
     if args.mode not in MODES:
         _print(f"invalid choice: {args.mode!r} (choose from {MODES})")
         return 2
 
     state = InterviewState()
     writer = make_writer(None)
-    if args.mode == "user":
-        reader = make_reader(None)
-        tool_surface = None
-    else:  # ai-research
-        reader = None
-        tool_surface = make_tool_surface(None)
+    reader = setup_reader(args.mode)
+    tool_surface = setup_surface(args.mode)
 
     try:
         run_interview(
