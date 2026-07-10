@@ -13,7 +13,7 @@ of the engine.
 PR #26 LLM review (🟠 major #1 + #2): the Adapter Protocol from
 src.adapter declares the contract; this module satisfies it. The
 shared install-time primitives (atomic write, backup, symlink refusal)
-now live in src.adapter._install instead of being co-located with
+now live in src.adapter.install instead of being co-located with
 codex-specific code.
 """
 
@@ -22,7 +22,7 @@ from __future__ import annotations
 from importlib import resources
 from pathlib import Path
 
-from src.adapter._install import (
+from src.adapter.install import (
     atomic_write_text,
     backup_existing,
     refuse_if_symlink_chain,
