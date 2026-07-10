@@ -417,3 +417,21 @@ def test_run_interview_caps_idea_length():
             stdin_reader=lambda prompt: "valid answer " * 5,
             stdout_writer=None,
         )
+
+
+def test_default_tool_surface_clamps_to_max_length():
+    """🟠 major (round 10): DefaultToolSurface.draft_answer previously produced
+    strings over per-question max_length; the validator then raised
+    ValidationError and the CLI exited 4 with a confusing message. Now
+    hard-clamps to max_length.
+    """
+    from src.engine.modes.ai_research import DefaultToolSurface
+    from src.schema.questions import QUESTIONS
+
+    surface = DefaultToolSurface()
+    long_idea = "x" * 2000  # at the per-question max
+    for q in QUESTIONS:
+        out = surface.draft_answer(question=q, idea=long_idea)
+        assert len(out) <= q["max_length"], (
+            f"DefaultToolSurface output {len(out)} > max_length {q['max_length']}"
+        )

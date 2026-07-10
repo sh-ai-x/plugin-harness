@@ -20,6 +20,12 @@ class DefaultToolSurface:
     """
 
     def draft_answer(self, *, question: dict, idea: str) -> str:
+        # PR #22 round 10 (major): the previous template produced
+        # strings over per-question max_length (e.g. a 2000-char idea
+        # plus the f-string literal plus the Korean prompt totaled
+        # ~2150 chars). _record would then raise ValidationError ->
+        # exit 4 with a confusing message blaming the surface.
+        # 1. Build the template; pad up to min_length if short.
         idea_fragment = idea.strip() or "your idea"
         template = (
             f"For the idea {idea_fragment!r}, address {question['id']!r}: "
@@ -28,7 +34,11 @@ class DefaultToolSurface:
         )
         if len(template) < question["min_length"]:
             template = template + " " + "x" * (question["min_length"] - len(template))
-        return template
+        # 2. Hard-clamp to max_length so the surface never produces
+        #    a string the validator will reject. Truncation is the
+        #    right behavior for the offline fallback; the real LLM
+        #    surface is expected to produce naturally bounded text.
+        return template[: question["max_length"]]
 
 
 def make_tool_surface(surface: Optional[ToolSurface]) -> ToolSurface:

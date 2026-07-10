@@ -16,14 +16,6 @@ from .questions import canonical_ids, get_question  # noqa: F401
 
 QUESTIONS: tuple = tuple(_QUESTIONS)
 
-__all__ = [
-    "QUESTIONS",
-    "canonical_ids",
-    "get_question",
-    "InterviewState",
-    "SchemaError",
-    "ValidationError",
-]
 from .state import InterviewState, SchemaError, ValidationError
 
 __all__ = [
