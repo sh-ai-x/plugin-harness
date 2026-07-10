@@ -19,11 +19,6 @@ from src.adapter.codex import register_codex
 
 
 CODEX_SKILL_PATH = Path(".agents/skills/plugin-harness/SKILL.md")
-EXPECTED_FIXTURE = Path(
-    "tests/fixtures/codex_install/expected/.agents/skills/plugin-harness/SKILL.md"
-)
-
-
 def test_register_codex_creates_skill_file() -> None:
     """register_codex MUST create the Codex skill at the expected path."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -47,14 +42,29 @@ def test_register_codex_is_idempotent() -> None:
         assert first == second, "idempotent re-run produced different content"
 
 
-def test_skill_matches_expected_fixture() -> None:
-    """Emitted SKILL.md matches the checked-in expected fixture."""
+def test_skill_matches_bundled_reference() -> None:
+    """Emitted SKILL.md matches the bundled reference resolved at test
+    time via importlib.resources — no on-disk fixture drift (PR #26
+    round 7 🟠 major: previous test_skill_matches_expected_fixture
+    compared against tests/fixtures/codex_install/expected/.../SKILL.md,
+    which was a byte-identical copy of the bundled source and so
+    could never detect drift between the two).
+    """
+    from importlib import resources
+    try:
+        bundled = (
+            resources.files("src.adapter.codex_skills.plugin-harness")
+            .joinpath("SKILL.md")
+            .read_text(encoding="utf-8")
+        )
+    except (ModuleNotFoundError, FileNotFoundError):
+        here = Path(__file__).resolve().parent.parent
+        bundled = (here / "src" / "adapter" / "codex_skills" / "plugin-harness" / "SKILL.md").read_text(encoding="utf-8")
     with tempfile.TemporaryDirectory() as tmp:
         project_dir = Path(tmp)
         register_codex(project_dir)
         emitted = (project_dir / CODEX_SKILL_PATH).read_text()
-        expected = EXPECTED_FIXTURE.read_text()
-        assert emitted == expected, "emitted SKILL.md drifted from fixture"
+        assert emitted == bundled, "emitted SKILL.md drifted from bundled reference"
 
 
 def test_skill_invokes_engine_cli() -> None:
