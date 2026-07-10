@@ -63,26 +63,40 @@ def validate_emit(output_dir: Path) -> ValidationReport:
         errors.append(f"skills directory missing at {skills_root}")
         return ValidationReport(ok=False, errors=errors)
 
-    # SKILL.md: find the single slug directory and check SKILL.md exists.
-    skill_dirs = [p for p in skills_root.iterdir() if p.is_dir()]
-    if not skill_dirs:
-        errors.append(f"no skill directory under {skills_root}")
-        return ValidationReport(ok=False, errors=errors)
-    if len(skill_dirs) > 1:
-        errors.append(
-            f"multiple skill directories under {skills_root}: "
-            f"{[p.name for p in skill_dirs]}"
-        )
-    skill_md = skill_dirs[0] / "SKILL.md"
-    if not skill_md.is_file():
-        errors.append(f"SKILL.md missing at {skill_md}")
-        return ValidationReport(ok=False, errors=errors)
-
-    # ------------------------------------------------------------ plugin.json shape
+    # PR #27 round 8 (🟠 major): parse plugin.json FIRST so we can use
+    # plugin_payload["skills"][0] to find the matching skill directory.
+    # Previously the validator blindly picked `skill_dirs[0]`, which
+    # silently mis-attributes errors when stale slugs linger.
     try:
         plugin_payload = json.loads(plugin_json_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
         errors.append(f"plugin.json is not valid JSON: {exc}")
+        return ValidationReport(ok=False, errors=errors)
+
+    # SKILL.md: locate the skill directory whose name matches the
+    # plugin_payload["skills"] slug list.
+    skill_slugs = plugin_payload.get("skills", [])
+    if not skill_slugs:
+        errors.append(f"plugin.json.skills is empty or missing")
+        return ValidationReport(ok=False, errors=errors)
+    expected_slug = skill_slugs[0]
+    expected_skill_md = skills_root / expected_slug / "SKILL.md"
+    if not expected_skill_md.is_file():
+        errors.append(
+            f"SKILL.md missing at expected path {expected_skill_md} "
+            f"(plugin.json.skills[0]={expected_slug!r})"
+        )
+        return ValidationReport(ok=False, errors=errors)
+    skill_md = expected_skill_md
+    skill_dirs = [p for p in skills_root.iterdir() if p.is_dir()]
+    if len(skill_dirs) > 1:
+        # Multiple slugs on disk is allowed (idempotent re-run), but
+        # only the one matching plugin.json is validated here.
+        errors.append(
+            f"multiple skill directories under {skills_root}: "
+            f"{[p.name for p in skill_dirs]}; validating {expected_slug!r}"
+        )
+
         return ValidationReport(ok=False, errors=errors)
 
     for required in ("name", "version", "description"):
