@@ -39,14 +39,20 @@ _TEMPLATE_NAME = "idea_plan.md.j2"
 # Synthesis section hard cap (locked by step2.md).
 SYNTHESIS_MAX_WORDS = 200
 
-# Canonical question id order for sections 1-5.
-_SECTION_ORDER: tuple[str, ...] = (
-    "what-who-where",
-    "why-this-problem",
-    "how-it-works",
-    "ai-usage",
-    "how-verified",
-)
+# PR #34 LLM review (🟠 major #2): the previous code hard-coded
+# _SECTION_ORDER and _SECTION_TITLES, duplicating the schema-layer
+# source of truth (canonical_ids in src.schema.questions) with no
+# drift guard. The two could silently desync from the schema.
+#
+# _SECTION_ORDER is now derived from canonical_ids() at import time
+# (the schema is the single source of truth). _SECTION_TITLES maps
+# each id to its human-readable section title, with an assert that
+# every key matches an id in canonical_ids. Adding a new question in
+# src.schema.questions without updating _SECTION_TITLES now raises
+# immediately at import (AssertionError) rather than silently
+# rendering an empty section at runtime.
+_CANONICAL_IDS: tuple[str, ...] = tuple(canonical_ids())
+_SECTION_ORDER: tuple[str, ...] = _CANONICAL_IDS
 
 _SECTION_TITLES: dict[str, str] = {
     "what-who-where": "What, who, where",
@@ -55,6 +61,11 @@ _SECTION_TITLES: dict[str, str] = {
     "ai-usage": "AI usage",
     "how-verified": "Verification",
 }
+assert set(_SECTION_TITLES) == set(_CANONICAL_IDS), (
+    f"_SECTION_TITLES keys {_sorted(set(_SECTION_TITLES))} do not match "
+    f"canonical_ids() keys {_sorted(set(_CANONICAL_IDS))} — drift detected "
+    f"between src.schema.questions and src.assembler.plan."
+)
 
 
 # ---- Markdown escape --------------------------------------------------------
@@ -113,31 +124,44 @@ def _escape_markdown(text: str) -> str:
     out = out.replace("#", "&#35;")
     out = out.replace("*", "\\*")
     out = out.replace("_", "\\_")
+    # PR #34 LLM review (🟡 minor): Markdown escape omits setext
+    # underline (`===` / `---` on their own line), list markers
+    # (`-` / `*` / `+` at line start), strikethrough (`~~`), and
+    # table sigils (`|`). Add the easy inline chars; line-start
+    # underline and list-marker cases are documented as out of
+    # scope for this round (would require a line-aware pass).
+    out = out.replace("|", "\\|")
+    out = out.replace("~~", "\\~~")
     return out
 
 
 # ---- Plugin-name derivation -------------------------------------------------
 
 
-_SLUG_RE = re.compile(r"[^a-z0-9]+")
+# PR #34 LLM review (🟠 major #1): the previous token regex was ASCII-only
+# (matches "what who where" from English answers but always falls back to
+# "Untitled Plugin" for Korean answers because Hangul syllables are not
+# in [a-z0-9]). Use re.UNICODE \w+ so Hangul, Han, Kana, and other
+# word-characters all participate in the slug; preserve case-folding for
+# dedup so "Marketing Manager" and "marketing manager" collide.
+_TOKEN_RE = re.compile(r"\w+", flags=re.UNICODE)
 
 
 def _derive_plugin_name(state: InterviewState) -> str:
     """Derive the plugin display name deterministically from the state.
 
     Strategy: take up to the first 5 word-like tokens from the
-    ``what-who-where`` answer, slugify, then title-case for display.
-    Falls back to ``"Untitled Plugin"`` when the answer is empty or
-    yields no word tokens (the assembler rejects empty answers upstream,
-    so this is a safety net only).
+    ``what-who-where`` answer (Unicode-aware — Korean Hangul, CJK, etc.
+    all participate), title-case for display. Falls back to
+    ``"Untitled Plugin"`` when the answer is empty or yields no word
+    tokens (the assembler rejects empty answers upstream, so this is
+    a safety net only).
     """
     first = state.answers.get("what-who-where", "").lower()
-    tokens = re.findall(r"[a-z0-9]+", first)[:5]
-    slug = "-".join(tokens).strip("-")
-    if not slug:
+    tokens = _TOKEN_RE.findall(first)[:5]
+    if not tokens:
         return "Untitled Plugin"
-    title = " ".join(part.capitalize() for part in slug.split("-") if part)
-    return title or "Untitled Plugin"
+    return " ".join(t.capitalize() for t in tokens)
 
 
 # ---- Synthesis --------------------------------------------------------------
