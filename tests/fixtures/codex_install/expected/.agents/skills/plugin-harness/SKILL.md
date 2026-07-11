@@ -1,6 +1,6 @@
 ---
 name: plugin-harness
-description: Plan and emit a new plugin from a one-line idea using the 5-question interview and the dual-runtime emitter.
+description: Interactively author a dual-runtime plugin by answering 5 fixed questions (what/who/where, why-this-problem, how-it-works, ai-usage, how-verified), then assemble and emit a Codex-layout plugin. Use when a user wants to turn an idea into an installable plugin without writing boilerplate by hand.
 ---
 
 # plugin-harness

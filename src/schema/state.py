@@ -63,7 +63,16 @@ class InterviewState:
         return QUESTIONS[self._cursor]
 
     def is_complete(self) -> bool:
-        return self._cursor >= len(QUESTIONS) and len(self.answers) == len(QUESTIONS)
+        # PR #28 / step-6 round-1: completeness is a function of the answer
+        # set, NOT the cursor position. set_answer() documents that it
+        # ONLY records (and validates); advance() moves the cursor.
+        # Therefore requiring _cursor >= len(QUESTIONS) is an invariant
+        # violation — every caller that filled all 5 answers without
+        # calling advance() (the test_emitter.py:46 fixture, offline bulk
+        # import, deserialization of pre-populated states) was wrongly
+        # reported incomplete. See regression test:
+        # test_is_complete_true_when_all_answers_set_via_set_answer_without_advance.
+        return len(self.answers) >= len(QUESTIONS)
 
     def advance(self) -> None:
         # PR #21 review (security round 3, major): advance() now refuses
