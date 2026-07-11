@@ -16,9 +16,6 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
       - name: Direct push to main — policy violation recorded
         run: bash scripts/branch-policy.sh
 
