@@ -24,6 +24,12 @@ jobs:
     name: branch-policy
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # The provenance probe (`gh api /commits/{sha}/pulls`) needs to read PRs.
+    # This block overrides the workflow-level `contents: read`, so both scopes
+    # must be listed: `contents` for checkout, `pull-requests` for the probe.
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       # A03/A08: SHA-pin CI actions (mutable `@v4` tag re-binds on every
       # upstream re-tag, including a compromised maintainer account).
@@ -33,6 +39,11 @@ jobs:
         with:
           fetch-depth: 1
       - name: Direct push to main — policy violation recorded
+        # gh CLI in Actions does not auto-read the workflow token; without
+        # GH_TOKEN, `gh api` aborts to stderr and the probe fail-closes on
+        # every push (including legitimate PR merges). Supply it explicitly.
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: bash scripts/branch-policy.sh
 
   test:
