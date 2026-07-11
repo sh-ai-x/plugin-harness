@@ -162,7 +162,26 @@ class InterviewState:
         if not isinstance(raw_answers, dict):
             raise SchemaError("payload['answers'] must be a dict")
         ids = canonical_ids()
-        unknown = [k for k in raw_answers.keys() if k not in ids]
+        canonical_id_set = set(ids)
+        # PR #22 round 12 (🟠 major): cap the unknown-key materialization
+        # before building the `unknown` list. A payload with millions of
+        # bogus keys would otherwise allocate the whole list (and a
+        # sorted copy for the SchemaError message) before raising. The
+        # cap is `len(canonical_ids()) + N`; we only need that many
+        # entries to report a useful error, and any payload that exceeds
+        # it is by definition trying to drive a memory-DoS.
+        unknown: list[str] = []
+        try:
+            for k in raw_answers.keys():
+                if k not in canonical_id_set:
+                    unknown.append(k)
+                    if len(unknown) > 16:
+                        raise SchemaError(
+                            "payload contains too many unknown question ids "
+                            "(DoS cap; > 16)"
+                        )
+        finally:
+            canonical_id_set = None  # noqa: F841  release the set view early
         if unknown:
             raise SchemaError(
                 f"payload contains unknown question ids: {sorted(unknown)!r}"

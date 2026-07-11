@@ -9,6 +9,7 @@ entrypoint (`python -m src.engine.cli`).
 
 from __future__ import annotations
 
+import os
 import pathlib
 import tempfile
 from pathlib import Path
@@ -46,11 +47,13 @@ def test_skill_matches_bundled_reference() -> None:
     """Emitted SKILL.md matches the bundled reference resolved at test
     time via importlib.resources — no on-disk fixture drift (PR #26
     round 7 🟠 major: previous test_skill_matches_expected_fixture
-    compared against tests/fixtures/codex_install/expected/.../SKILL.md,
-    which was a byte-identical copy of the bundled source and so
-    could never detect drift between the two).
+    compared against the bundled source resolved at test time via
+    importlib.resources (with editable-install fallback), so the
+    test pins against the real reference rather than a checked-in
+    byte-identical copy (PR #26 round 7).
     """
     from importlib import resources
+    from src.adapter import codex_skills  # PR #26 round 12: codex_skills/ now has __init__.py at every level; no # type: ignore needed.
     try:
         bundled = (
             resources.files("src.adapter.codex_skills.plugin-harness")
@@ -58,6 +61,7 @@ def test_skill_matches_bundled_reference() -> None:
             .read_text(encoding="utf-8")
         )
     except (ModuleNotFoundError, FileNotFoundError):
+        # Editable install: read from source tree.
         here = Path(__file__).resolve().parent.parent
         bundled = (here / "src" / "adapter" / "codex_skills" / "plugin-harness" / "SKILL.md").read_text(encoding="utf-8")
     with tempfile.TemporaryDirectory() as tmp:
@@ -102,7 +106,10 @@ def test_no_dev_kit_token_in_emitted_skill(tmp_path: Path) -> None:
 
 def test_no_dev_kit_in_adapter_source() -> None:
     """src/adapter/ source MUST NOT contain 'dev-kit' (AC3)."""
-    adapter_dir = Path("src/adapter")
+    # PR #26 round 9 minor: anchor on __file__ so the test runs
+    # from any cwd (not just the repo root).
+    here = Path(__file__).resolve().parent
+    adapter_dir = here.parent / "src" / "adapter"
     assert adapter_dir.is_dir(), "src/adapter/ should exist"
     offenders: list[str] = []
     for path in adapter_dir.rglob("*"):
@@ -125,3 +132,55 @@ def test_register_codex_accepts_pathlib_path() -> None:
     assert params, "register_codex must declare at least one parameter"
     first = params[0]
     assert first.annotation in (pathlib.Path, "pathlib.Path") or first.name == "project_dir"
+
+
+# ---------- PR #26 review regression: A06 majors ----------
+def test_register_codex_refuses_symlink_under_project():
+    """A06-3: refuse the install if any path under the project is a symlink."""
+    import pytest
+    with tempfile.TemporaryDirectory() as td:
+        project = pathlib.Path(td)
+        # Pre-plant a symlink at the target SKILL.md path
+        skill_dir = project / ".agents" / "skills" / "plugin-harness"
+        skill_dir.mkdir(parents=True)
+        skill_md = skill_dir / "SKILL.md"
+        skill_md.symlink_to("/etc/passwd")
+        with pytest.raises(FileExistsError, match="refusing to write through symlink"):
+            register_codex(project)
+
+
+def test_register_codex_atomic_write_creates_no_tempfile_residue():
+    """A06-1: success path leaves no .tmp residue under the project."""
+    with tempfile.TemporaryDirectory() as td:
+        project = pathlib.Path(td)
+        register_codex(project)
+        residual = list((project / ".agents").rglob("*.tmp"))
+        assert residual == [], f"unexpected tempfile residue: {residual}"
+
+
+def test_register_codex_explicit_file_mode_0o644(tmp_path):
+    """A02 minor: explicit mode 0o644 — not world-writable under permissive umask."""
+    old_umask = os.umask(0o000)  # worst-case permissive
+    try:
+        register_codex(tmp_path)
+        skill = tmp_path / ".agents" / "skills" / "plugin-harness" / "SKILL.md"
+        mode = skill.stat().st_mode & 0o777
+        assert mode == 0o644, f"expected 0o644, got {oct(mode)}"
+    finally:
+        os.umask(old_umask)
+
+
+def test_register_codex_backup_prior_when_file_exists():
+    """A06-2: a pre-existing SKILL.md is preserved as a .bak.<ts> sibling."""
+    import re
+    with tempfile.TemporaryDirectory() as td:
+        project = pathlib.Path(td)
+        skill_dir = project / ".agents" / "skills" / "plugin-harness"
+        skill_dir.mkdir(parents=True)
+        skill_md = skill_dir / "SKILL.md"
+        skill_md.write_text("hand-authored content", encoding="utf-8")
+        register_codex(project)
+        # The new SKILL.md reflects the bundled install; the prior is preserved
+        backups = list(skill_dir.glob("SKILL.md.bak.*"))
+        assert len(backups) == 1
+        assert backups[0].read_text(encoding="utf-8") == "hand-authored content"

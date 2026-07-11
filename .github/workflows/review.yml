@@ -553,34 +553,86 @@ jobs:
 
       - name: Combined verdict gate
         run: |
-          # PR #30.1 (root-cause fix): extract verdicts at gate time,
-          # not from job outputs. The review/security extract step
-          # runs immediately when the job starts, BEFORE the LLM has
-          # posted its verdict comment, so job outputs capture stale
-          # verdicts. The gate runs AFTER both jobs complete, so any
-          # newly posted comments are visible. Extract here.
+          # PR #26 root-cause fix: split the R and S extraction
+          # pipelines so the two dimensions can diverge.
+          #
+          # Pre-fix (PR #26 LLM 🔴 critical): both R and S were
+          # extracted from a single `gh api .../comments` call filtered
+          # by `startswith("claude")`. The pipelines were byte-
+          # identical, so "worst-of(review, security)" collapsed to
+          # "the latest comment the selector matched" regardless of
+          # which agent posted it. A wrong/empty dimension could pass
+          # the gate as Approve, masking a real critical finding.
+          #
+          # The fix: classify each comment by dimension, then take the
+          # newest FRESH comment (created_at >= run_started) per
+          # dimension. Out-of-class comments (no header, wrong header,
+          # older round) are excluded.
+          #
+          #   - claude[bot]   Review body  carries `Review summary`
+          #   - claude[bot]   Security body carries `Security summary`
+          #   - github-actions[bot] fallback posts include the literal
+          #     `LLM review (3-dim)` / `LLM security (10-dim OWASP)`
+          #     markers used by `needs_fallback` post-steps
+          #
+          # PR #26 LLM 🟠 major #1: replace `startswith("claude")`
+          # with an exact-match on `claude[bot]`. The previous
+          # startswith would also match any future user named e.g.
+          # `claudette` or `claude-fan`. The GitHub App login is
+          # exactly `claude[bot]` -- always.
           EVENT="$EVENT_NAME"
-          R="$(gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
-            --jq '.[] | select((.user.login // "") | startswith("claude")) | .body' \
-            | grep -E 'Verdict: (Approve|Blocked|Changes Requested)' | tail -1 \
-            | grep -oE 'Verdict:[[:space:]]*(Approve|Blocked|Changes Requested)' \
-            | sed -E 's/.*Verdict:[[:space:]]*//')"
-          S="$(gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
-            --jq '.[] | select((.user.login // "") | startswith("claude")) | .body' \
-            | grep -E 'Verdict: (Approve|Blocked|Changes Requested)' | tail -1 \
-            | grep -oE 'Verdict:[[:space:]]*(Approve|Blocked|Changes Requested)' \
-            | sed -E 's/.*Verdict:[[:space:]]*//')"
+          RUN_STARTED="${{ github.event.pull_request.updated_at }}"
+
+          # fetch_comments: filter comments to one dimension, keep
+          # only fresh ones (created_at >= run_started). Returns one
+          # line per surviving comment: "<created_at>|<verdict>".
+          fetch_comments() {
+            local marker="$1"
+            gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+              --jq '.[] | {user: .user.login, body: .body, created_at: .created_at}' \
+            | jq -r --arg marker "$marker" --arg run_started "$RUN_STARTED" '
+                select(
+                  (.user == "claude[bot]" and (.body | contains($marker)))
+                  or
+                  (.user == "github-actions[bot]" and (.body | contains($marker)))
+                )
+                | select(.created_at >= $run_started)
+                | (.created_at) + "|" +
+                  (if (.body | test("Verdict:[[:space:]]*(Approve|Blocked|Changes Requested)"))
+                   then (.body | capture("Verdict:[[:space:]]*(?<v>Approve|Blocked|Changes Requested)").v)
+                   else "" end)
+              '
+          }
+
+          # Per-dimension: latest fresh verdict. gh api returns
+          # comments in chronological order (oldest first); the jq
+          # filter keeps only fresh matching comments; tail -1 picks
+          # the newest.
+          R="$(fetch_comments 'Review summary' | tail -1 | awk -F'|' '{print $2}')"
+          S="$(fetch_comments 'Security summary' | tail -1 | awk -F'|' '{print $2}')"
+
+          # Fallback stream: when the LLM is skipped (workflow-
+          # validation guard, rate-limit), the action does NOT post.
+          # The workflow's own `needs_fallback` post-step then posts
+          # `Verdict: Approve` via `github-actions[bot]`, tagged with
+          # the dimension's exact wording. Match those as fallback
+          # sources so a skipped dimension does not block the gate.
+          RF="$(fetch_comments 'LLM review (3-dim)' | tail -1 | awk -F'|' '{print $2}')"
+          SF="$(fetch_comments 'LLM security (10-dim OWASP)' | tail -1 | awk -F'|' '{print $2}')"
+          [ -z "$R" ] && R="$RF"
+          [ -z "$S" ] && S="$SF"
+
           echo "review=$R  security=$S"
 
-          # Fallback to Approve when LLM didn't run on this PR. Empty
-          # R or S = workflow-validation skip (PR modifies workflow files)
-          # or LLM rate-limit. The review job's needs_fallback branch emits
-          # 'Verdict: Approve' for this exact case; mirror it here so the
-          # gate clears when the LLM is intentionally skipped.
+          # Stale-detection fallback: if a dimension has no fresh
+          # comment AND no fresh fallback, the LLM didn't post this
+          # round. Default to Approve rather than blocking on a stale
+          # verdict from a previous round (PR #30 + PR #34 established
+          # this contract).
           if [ -z "$R" ] || [ -z "$S" ]; then
-            echo "::warning::review/security verdict missing (event=$EVENT); defaulting to Approve (LLM did not run, likely workflow-validation skip)"
-            R="${R:-Approve}"
-            S="${S:-Approve}"
+            echo "::warning::review/security verdict stale or missing (event=$EVENT, run_started=$RUN_STARTED); defaulting to Approve (LLM did not post during this run -- workflow-validation skip or rate-limit)"
+            if [ -z "$R" ]; then R="Approve"; fi
+            if [ -z "$S" ]; then S="Approve"; fi
           fi
 
           # worst-of wins

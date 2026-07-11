@@ -9,7 +9,7 @@ from __future__ import annotations
 import sys
 from typing import Callable, Optional
 
-from src.engine.runner import UserAbortError
+from src.engine.errors import UserAbortError
 
 
 def default_stdin_reader(prompt: str) -> str:
@@ -38,3 +38,24 @@ def make_reader(reader: Optional[Callable[[str], str]]) -> Callable[[str], str]:
 
 def make_writer(writer: Optional[Callable[[str], None]]) -> Callable[[str], None]:
     return writer if writer is not None else default_stdout_writer
+
+# PR #22 round 9: register this mode's setup with the dispatch table.
+# PR #22 round 12 (🟠 major #3): also register the reader factory so
+# cli.py looks it up via src.engine.modes.setup_reader() instead of
+# importing make_reader directly. user mode does not use a tool
+# surface — register a no-op so cli.py can call setup_surface("user")
+# uniformly without branching on the mode name.
+from src.engine.modes import register_mode, register_reader, register_surface
+def _setup_user_mode(make_reader, make_writer, _make_tool_surface):
+    return make_reader(None), make_writer(None), None
+
+register_reader("user", make_reader)
+register_surface("user", lambda override: None)
+
+
+def _user_per_question(question, idea, stdin_reader, _tool_surface):
+    """Per-question handler for the 'user' mode."""
+    if stdin_reader is None:
+        raise UserAbortError("user mode requires stdin_reader")
+    return stdin_reader(question["prompt"])
+register_mode("user", _user_per_question)

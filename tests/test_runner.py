@@ -310,3 +310,157 @@ def test_runner_rejects_unknown_mode():
             tool_surface=_FakeToolSurface(),
             stdout_writer=_stdout_writer(_stdout_capture()),
         )
+
+# ---------- PR #22 review regression: KeyboardInterrupt parity ----------
+def test_mode_ai_research_keyboardinterrupt_translates_to_user_abort():
+    """PR #22 review (🟠 major A10-006): ai-research branch was leaking
+    KeyboardInterrupt as traceback + exit 1, inconsistent with user-mode's
+    UserAbortError + exit 3. Verify the translator site lives in runner.
+    """
+    from src.engine.runner import run_interview, UserAbortError
+
+    class _KbIntToolSurface:
+        def draft_answer(self, *, question: dict, idea: str) -> str:
+            raise KeyboardInterrupt("Ctrl-C")
+
+    state = InterviewState()
+    with pytest.raises(UserAbortError):
+        run_interview(
+            state,
+            mode="ai-research",
+            idea="some idea",
+            tool_surface=_KbIntToolSurface(),
+            stdout_writer=None,
+            stdin_reader=None,
+        )
+    assert state.answers == {}, "no answers should be recorded on Ctrl-C"
+
+
+# ---------- PR #22 round 8 regression ----------
+def test_ai_draft_preserves_user_abort_through_tool_surface():
+    """🟠 major: _ai_draft now re-raises UserAbortError from the tool surface
+    so the CLI exits 3 instead of swallowing it as InterviewIncompleteError (exit 4).
+    """
+    from src.engine.runner import run_interview, UserAbortError, InterviewIncompleteError
+
+    class _AbortToolSurface:
+        def draft_answer(self, *, question: dict, idea: str) -> str:
+            raise UserAbortError("tool surface aborted")
+
+    state = InterviewState()
+    with pytest.raises(UserAbortError):
+        run_interview(
+            state,
+            mode="ai-research",
+            idea="x",
+            tool_surface=_AbortToolSurface(),
+            stdout_writer=None,
+            stdin_reader=None,
+        )
+
+
+def test_ai_draft_surfaces_only_type_name_for_unexpected_errors():
+    """🟠 major: tool-surface errors that aren't UserAbortError/KeyboardInterrupt
+    become InterviewIncompleteError with `type(exc).__name__`, not the full
+    str(exc) (which can leak LLM-prompt content or auth headers).
+    """
+    from src.engine.runner import run_interview, InterviewIncompleteError
+
+    class _BoomToolSurface:
+        def draft_answer(self, *, question: dict, idea: str) -> str:
+            raise RuntimeError("leaked-secret-prompt-content")
+
+    state = InterviewState()
+    with pytest.raises(InterviewIncompleteError) as exc_info:
+        run_interview(
+            state,
+            mode="ai-research",
+            idea="x",
+            tool_surface=_BoomToolSurface(),
+            stdout_writer=None,
+            stdin_reader=None,
+        )
+    # PR #22 round 11 (🟠 major): the per-mode dispatchable handler
+    # wraps the surface error and surfaces only type(exc).__name__
+    # in the message — the original RuntimeError is preserved via
+    # __cause__ for any future logging.
+    assert "leaked-secret-prompt-content" not in str(exc_info.value)
+    assert "RuntimeError" in str(exc_info.value)
+    cause = exc_info.value.__cause__
+    assert cause is not None
+    assert isinstance(cause, RuntimeError)
+
+
+# ---------- PR #22 round 9 regression: data-driven mode dispatch ----------
+def test_mode_dispatch_registers_both_modes():
+    """🟠 major: MODE_DISPATCH must include both 'user' and 'ai-research' after
+    the mode modules have been imported. cli.py and runner.py look up the
+    setup callable by name; a missing entry would silently route to the
+    wrong branch."""
+    from src.engine.modes import MODE_DISPATCH, MODES
+    for name in MODES:
+        assert name in MODE_DISPATCH, f"mode {name!r} not registered"
+
+
+def test_mode_dispatch_unknown_name_raises():
+    """🟠 major: lookup of an unknown mode raises KeyError so the CLI layer
+    can surface a clear error rather than silently routing to the wrong branch."""
+    from src.engine.modes import dispatch_for
+    with pytest.raises(KeyError):
+        dispatch_for("not-a-real-mode")
+
+
+def test_run_interview_caps_idea_length():
+    """🟡 minor: run_interview rejects `idea` longer than MAX_IDEA_LEN so
+    library callers that bypass the CLI cap cannot drive unbounded
+    f-string allocation through DefaultToolSurface."""
+    from src.engine.runner import run_interview, InterviewIncompleteError, MAX_IDEA_LEN
+    state = InterviewState()
+    with pytest.raises(InterviewIncompleteError, match="idea parameter exceeds"):
+        run_interview(
+            state,
+            mode="user",
+            idea="x" * (MAX_IDEA_LEN + 1),
+            stdin_reader=lambda prompt: "valid answer " * 5,
+            stdout_writer=None,
+        )
+
+
+def test_default_tool_surface_clamps_to_max_length():
+    """🟠 major (round 10): DefaultToolSurface.draft_answer previously produced
+    strings over per-question max_length; the validator then raised
+    ValidationError and the CLI exited 4 with a confusing message. Now
+    hard-clamps to max_length.
+    """
+    from src.engine.modes.ai_research import DefaultToolSurface
+    from src.schema.questions import QUESTIONS
+
+    surface = DefaultToolSurface()
+    long_idea = "x" * 2000  # at the per-question max
+    for q in QUESTIONS:
+        out = surface.draft_answer(question=q, idea=long_idea)
+        assert len(out) <= q["max_length"], (
+            f"DefaultToolSurface output {len(out)} > max_length {q['max_length']}"
+        )
+
+
+def test_run_interview_rejects_missing_stdin_reader_for_user_mode():
+    """PR #22 round 12: missing stdin_reader for 'user' mode now raises ValueError
+    BEFORE the first prompt is emitted, mapping to exit 2 (programming
+    error) rather than mid-interview UserAbortError → exit 3.
+    """
+    from src.engine.runner import run_interview, InterviewState
+    state = InterviewState()
+    with pytest.raises(ValueError, match="'user' mode requires stdin_reader"):
+        run_interview(state, mode="user", idea="x",
+                     stdin_reader=None, stdout_writer=None)
+
+
+def test_run_interview_rejects_missing_tool_surface_for_ai_research_mode():
+    """PR #22 round 12: same for ai-research."""
+    from src.engine.runner import run_interview, InterviewState
+    state = InterviewState()
+    with pytest.raises(ValueError, match="'ai-research' mode requires tool_surface"):
+        run_interview(state, mode="ai-research", idea="x",
+                     stdin_reader=None, stdout_writer=None,
+                     tool_surface=None)

@@ -15,8 +15,6 @@ import argparse
 import sys
 from typing import List, Optional
 
-from src.engine.modes.ai_research import make_tool_surface
-from src.engine.modes.user_driven import make_reader, make_writer
 from src.engine.runner import (
     InterviewIncompleteError,
     UserAbortError,
@@ -25,7 +23,19 @@ from src.engine.runner import (
 from src.schema.state import InterviewState
 
 
-VALID_MODES = ("user", "ai-research")
+# PR #22 round 8 (major #3): mode list lifted into
+# src/engine/modes/__init__.py as the single source of truth. Import
+# MODES there and use it for argparse choices and validation.
+# PR #22 round 12 (🟠 major #3): per-mode reader + tool-surface
+# factories are also looked up through the registry. cli.py no longer
+# imports `make_reader` / `make_tool_surface` directly from per-mode
+# modules — adding a third mode requires no changes here.
+from src.engine.modes import (
+    MODES,
+    setup_reader,
+    setup_surface,
+)
+from src.engine.modes.user_driven import make_writer  # writer is shared across modes
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -35,14 +45,30 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="subcommand", required=True)
     new_cmd = sub.add_parser("new", help="Start a new interview for an idea.")
-    new_cmd.add_argument("idea", help="One-line description of the plugin idea.")
+    def _idea_value(value: str) -> str:
+        # PR #22 round 11 (🟠 major): wire MAX_IDEA_LENGTH into argparse.
+        # Oversize input exits 2 (invalid args), not 4 (incomplete).
+        if len(value) > MAX_IDEA_LENGTH:
+            raise argparse.ArgumentTypeError(
+                f"--idea exceeds MAX_IDEA_LENGTH={MAX_IDEA_LENGTH} chars"
+            )
+        return value
+
+    new_cmd.add_argument("idea", type=_idea_value, help="One-line description of the plugin idea.")
     new_cmd.add_argument(
         "--mode",
-        choices=VALID_MODES,
+        choices=MODES,
         default="user",
         help="Interview mode: 'user' (stdin) or 'ai-research' (tool surface).",
     )
     return parser
+
+
+# PR #22 round 9 (🟡 minor): cap the --idea argument at the CLI layer
+# so DefaultToolSurface cannot allocate an unbounded f-string before
+# max_length validation rejects it. 2000 chars matches per-question
+# max_length in src/schema/questions.py (the answer-side cap).
+MAX_IDEA_LENGTH = 2000
 
 
 def _print(line: str) -> None:
@@ -62,19 +88,26 @@ def main(argv: Optional[List[str]] = None) -> int:
         _print(f"unknown subcommand {args.subcommand!r}")
         return 2
 
-    if args.mode not in VALID_MODES:
-        _print(f"invalid choice: {args.mode!r} (choose from {VALID_MODES})")
+    # PR #22 round 9 (🟠 major): data-driven dispatch via MODE_DISPATCH.
+    # Each mode module self-registers a setup callable at import
+    # time; cli.py looks it up by name. MODES and MODE_DISPATCH
+    # are imported at module top; no need to re-import here.
+    # PR #22 round 11: MODE_DISPATCH is now per-question (used by
+    # runner.py, not cli.py). The CLI layer still constructs
+    # reader/writer/surface here; the per-question handler looks them
+    # up at runtime.
+    # PR #22 round 12 (🟠 major #2 + #3): per-mode reader and
+    # tool-surface factories are looked up via src.engine.modes. The
+    # `if args.mode == "user": ... else: ...` hardcoded branch is
+    # gone — adding a third mode requires no changes here.
+    if args.mode not in MODES:
+        _print(f"invalid choice: {args.mode!r} (choose from {MODES})")
         return 2
 
     state = InterviewState()
     writer = make_writer(None)
-
-    if args.mode == "user":
-        reader = make_reader(None)
-        tool_surface = None
-    else:
-        reader = None
-        tool_surface = make_tool_surface(None)
+    reader = setup_reader(args.mode)
+    tool_surface = setup_surface(args.mode)
 
     try:
         run_interview(

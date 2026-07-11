@@ -25,7 +25,6 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
-from src.emitter._shared.md_escape import md_escape
 from src.schema.questions import QUESTIONS, canonical_ids
 from src.schema.state import InterviewState
 
@@ -40,14 +39,20 @@ _TEMPLATE_NAME = "idea_plan.md.j2"
 # Synthesis section hard cap (locked by step2.md).
 SYNTHESIS_MAX_WORDS = 200
 
-# Canonical question id order for sections 1-5.
-_SECTION_ORDER: tuple[str, ...] = (
-    "what-who-where",
-    "why-this-problem",
-    "how-it-works",
-    "ai-usage",
-    "how-verified",
-)
+# PR #34 LLM review (🟠 major #2): the previous code hard-coded
+# _SECTION_ORDER and _SECTION_TITLES, duplicating the schema-layer
+# source of truth (canonical_ids in src.schema.questions) with no
+# drift guard. The two could silently desync from the schema.
+#
+# _SECTION_ORDER is now derived from canonical_ids() at import time
+# (the schema is the single source of truth). _SECTION_TITLES maps
+# each id to its human-readable section title, with an assert that
+# every key matches an id in canonical_ids. Adding a new question in
+# src.schema.questions without updating _SECTION_TITLES now raises
+# immediately at import (AssertionError) rather than silently
+# rendering an empty section at runtime.
+_CANONICAL_IDS: tuple[str, ...] = tuple(canonical_ids())
+_SECTION_ORDER: tuple[str, ...] = _CANONICAL_IDS
 
 _SECTION_TITLES: dict[str, str] = {
     "what-who-where": "What, who, where",
@@ -56,43 +61,107 @@ _SECTION_TITLES: dict[str, str] = {
     "ai-usage": "AI usage",
     "how-verified": "Verification",
 }
+assert set(_SECTION_TITLES) == set(_CANONICAL_IDS), (
+    f"_SECTION_TITLES keys {_sorted(set(_SECTION_TITLES))} do not match "
+    f"canonical_ids() keys {_sorted(set(_CANONICAL_IDS))} — drift detected "
+    f"between src.schema.questions and src.assembler.plan."
+)
 
 
 # ---- Markdown escape --------------------------------------------------------
 
 
-# PR #27 LLM review (🟠 major #3): the local `_escape_markdown` table
-# here disagreed with codex.py's `_md_escape` on (`(`, `)`) coverage
-# and on the `#` representation (HTML entity vs backslash-prefix).
-# Both files now route through `md_escape` from
-# `src.emitter._shared.md_escape` so the plan assembler and the
-# Codex emitter agree on a single canonical escape table.
-# (Function `md_escape` is imported above; this stub remains as a
-# regression-detection marker.)
+# Order is significant: < first (does not introduce newlines), then > with
+# leading-aware handling, then the inline-punctuation tokens, then the
+# heading-anchor (#) last. We do NOT escape '!' — AC4 verifies it stays raw.
+def _escape_markdown(text: str) -> str:
+    """Neutralize Markdown-significant characters in user-supplied answer text.
+
+    Escape table (per phases/0-mvp/step2.md AC4):
+        '<'     -> '&lt;'
+        '>'     -> '\\>'   (start of string, OR preceded by actual '\\n',
+                            OR preceded by literal '\\' — the case after
+                            a literal '\\n' two-char sequence in the input)
+              -> '&gt;'   (otherwise)
+        '['     -> '\\['
+        ']'     -> '\\]'
+        '('     -> '\\('
+        ')'     -> '\\)'
+        '`'     -> '\\`'
+        '#'     -> '&#35;'
+        '*'     -> '\\*'
+        '_'     -> '\\_'
+
+    '!' is intentionally NOT escaped (image-syntax break is acceptable;
+    AC4 verifies `!important` stays raw). Section headings are NOT escaped
+    because they are hard-coded strings, not user input.
+
+    The '>' substitution is done in a single regex pass so the '>' inside
+    any '\\>' we just inserted is not re-matched. The "<" pass is run first
+    so its replacement '&lt;' does not collide with the '>' pass.
+    """
+    if not text:
+        return text
+    # 1. '<' first so its replacement '&lt;' does not introduce a '<'.
+    out = text.replace("<", "&lt;")
+    # 2. '>' — leading (start of input, OR preceded by '\\n' literal 2-char,
+    #    OR preceded by actual newline char) -> '\\>'. Else -> '&gt;'.
+    def _gt_repl(match: "re.Match[str]") -> str:
+        i = match.start()
+        if i == 0:
+            return "\\>"
+        prev = out[i - 1]
+        if prev == "\\" or prev == "\n":
+            return "\\>"
+        return "&gt;"
+    out = re.sub(">", _gt_repl, out)
+    # 3-10. remaining tokens
+    out = out.replace("[", "\\[")
+    out = out.replace("]", "\\]")
+    out = out.replace("(", "\\(")
+    out = out.replace(")", "\\)")
+    out = out.replace("`", "\\`")
+    out = out.replace("#", "&#35;")
+    out = out.replace("*", "\\*")
+    out = out.replace("_", "\\_")
+    # PR #34 LLM review (🟡 minor): Markdown escape omits setext
+    # underline (`===` / `---` on their own line), list markers
+    # (`-` / `*` / `+` at line start), strikethrough (`~~`), and
+    # table sigils (`|`). Add the easy inline chars; line-start
+    # underline and list-marker cases are documented as out of
+    # scope for this round (would require a line-aware pass).
+    out = out.replace("|", "\\|")
+    out = out.replace("~~", "\\~~")
+    return out
 
 
 # ---- Plugin-name derivation -------------------------------------------------
 
 
-_SLUG_RE = re.compile(r"[^a-z0-9]+")
+# PR #34 LLM review (🟠 major #1): the previous token regex was ASCII-only
+# (matches "what who where" from English answers but always falls back to
+# "Untitled Plugin" for Korean answers because Hangul syllables are not
+# in [a-z0-9]). Use re.UNICODE \w+ so Hangul, Han, Kana, and other
+# word-characters all participate in the slug; preserve case-folding for
+# dedup so "Marketing Manager" and "marketing manager" collide.
+_TOKEN_RE = re.compile(r"\w+", flags=re.UNICODE)
 
 
 def _derive_plugin_name(state: InterviewState) -> str:
     """Derive the plugin display name deterministically from the state.
 
     Strategy: take up to the first 5 word-like tokens from the
-    ``what-who-where`` answer, slugify, then title-case for display.
-    Falls back to ``"Untitled Plugin"`` when the answer is empty or
-    yields no word tokens (the assembler rejects empty answers upstream,
-    so this is a safety net only).
+    ``what-who-where`` answer (Unicode-aware — Korean Hangul, CJK, etc.
+    all participate), title-case for display. Falls back to
+    ``"Untitled Plugin"`` when the answer is empty or yields no word
+    tokens (the assembler rejects empty answers upstream, so this is
+    a safety net only).
     """
     first = state.answers.get("what-who-where", "").lower()
-    tokens = re.findall(r"[a-z0-9]+", first)[:5]
-    slug = "-".join(tokens).strip("-")
-    if not slug:
+    tokens = _TOKEN_RE.findall(first)[:5]
+    if not tokens:
         return "Untitled Plugin"
-    title = " ".join(part.capitalize() for part in slug.split("-") if part)
-    return title or "Untitled Plugin"
+    return " ".join(t.capitalize() for t in tokens)
 
 
 # ---- Synthesis --------------------------------------------------------------
@@ -121,7 +190,7 @@ def _derive_synthesis(state: InterviewState) -> str:
     )
     for bridge, source in zip(bridges, sources):
         snippet = _first_n_words(source, 60)
-        fragments.append(f"{bridge} {md_escape(snippet)}".strip())
+        fragments.append(f"{bridge} {_escape_markdown(snippet)}".strip())
     paragraph = " ".join(fragments)
     words = paragraph.split()
     if len(words) > SYNTHESIS_MAX_WORDS:
@@ -192,7 +261,7 @@ def assemble(state: InterviewState) -> str:
             {
                 "qid": qid,
                 "title": _SECTION_TITLES[qid],
-                "body": md_escape(state.answers[qid]),
+                "body": _escape_markdown(state.answers[qid]),
             }
         )
 

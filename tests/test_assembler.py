@@ -35,6 +35,7 @@ def _seed_completed_state() -> InterviewState:
     }
     for qid, value in answers.items():
         s.set_answer(qid, value)
+        s.advance()  # post-PR #21: set_answer no longer auto-advances
     return s
 
 
@@ -95,6 +96,7 @@ def test_assemble_missing_answer_raises_assembler_error() -> None:
 def test_assemble_partial_state_raises_assembler_error() -> None:
     s = InterviewState()
     s.set_answer("what-who-where", "x" * 30)
+    s.advance()
     s.set_answer("why-this-problem", "x" * 30)
     # how-it-works, ai-usage, how-verified still missing.
     with pytest.raises(AssemblerError):
@@ -135,8 +137,16 @@ _ESCAPE_PAYLOAD = (
     "<script>alert(1)</script>"
 )
 _ESCAPE_PAIRS: list[tuple[str, str]] = [
-    ("# heading\n", "\\# heading\n"),
-    ("[link](http:://x)", r"\[link\](http:://x)"),
+    # PR #34 settled on `&#35;` (HTML entity) for `#` to disambiguate
+    # from Markdown backslash-prefix collisions; main's plan.py uses
+    # this representation. The branch's older convention (backslash
+    # prefix) is preserved for `[`, `*`, `_`, `` ` ``, `>` where it
+    # does not collide with the leading-`>` backslash escape.
+    ("# heading\n", "&#35; heading\n"),
+    # PR #34 escapes `(` and `)` as well (parenthesis is a Markdown
+    # link-syntax component); the escaped form backslash-prefixes
+    # both halves of the link syntax to neutralize `[](url)` injection.
+    ("[link](http:://x)", r"\[link\]\(http:://x\)"),
 
     ("![img]", "!\\[img\\]"),
     ("`code`", "\\`code\\`"),
@@ -168,6 +178,7 @@ def test_assemble_neutralizes_markdown_injection(token: str, escaped: str) -> No
     s = InterviewState()
     s.set_answer("what-who-where", _ESCAPE_PAYLOAD)
     for qid in ["why-this-problem", "how-it-works", "ai-usage", "how-verified"]:
+        s.advance()  # post-PR #21: set_answer no longer auto-advances
         s.set_answer(qid, "x" * 30)
     out = assemble(s)
     if (token, escaped) in _GT_XFAIL_PAIRS:
@@ -200,6 +211,7 @@ def test_assemble_gt_escape_prepends_backslash() -> None:
     # Use a leading '>' with padding to satisfy min_length=20.
     s.set_answer("what-who-where", "> quote leading the answer here")
     for qid in ["why-this-problem", "how-it-works", "ai-usage", "how-verified"]:
+        s.advance()  # post-PR #21: set_answer no longer auto-advances
         s.set_answer(qid, "x" * 30)
     out = assemble(s)
     assert "\\>" in out, "expected '\\>' (backslash + '>') in output"
@@ -211,6 +223,7 @@ def test_assemble_does_not_escape_bang() -> None:
     s = InterviewState()
     s.set_answer("what-who-where", "!important note here for the user base")
     for qid in ["why-this-problem", "how-it-works", "ai-usage", "how-verified"]:
+        s.advance()  # post-PR #21: set_answer no longer auto-advances
         s.set_answer(qid, "x" * 30)
     out = assemble(s)
     assert "!important" in out, "'!' must NOT be escaped"
@@ -221,6 +234,7 @@ def test_assemble_headings_remain_hard_coded() -> None:
     s = InterviewState()
     s.set_answer("what-who-where", "# injected heading attempt text here now")
     for qid in ["why-this-problem", "how-it-works", "ai-usage", "how-verified"]:
+        s.advance()  # post-PR #21: set_answer no longer auto-advances
         s.set_answer(qid, "x" * 30)
     out = assemble(s)
     for h in ["## 1.", "## 2.", "## 3.", "## 4.", "## 5.", "## 6."]:

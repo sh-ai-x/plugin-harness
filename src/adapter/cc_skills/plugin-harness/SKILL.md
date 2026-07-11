@@ -41,10 +41,7 @@ layout under the configured output directory.
 
 ## Notes
 
-- The skill is installed at `.claude/skills/plugin-harness/SKILL.md` for
-  Claude Code and `.agents/skills/plugin-harness/SKILL.md` for Codex
-  (canonical Codex path per https://developers.openai.com/codex/skills).
-  The skill body is identical across runtimes; only the install path
-  differs.
+- The skill is installed at `.agents/skills/plugin-harness/SKILL.md`,
+  the canonical Codex path per https://developers.openai.com/codex/skills.
 - Re-running the install is idempotent — it overwrites the same file.
 - No external runtime dependencies beyond Python 3 and the engine CLI.

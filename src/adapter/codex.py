@@ -9,6 +9,12 @@ identically from CC and Codex (one command, two surfaces).
 
 The adapter is install-time only — it does not modify runtime behavior
 of the engine.
+
+PR #26 LLM review (🟠 major #1 + #2): the Adapter Protocol from
+src.adapter declares the contract; this module satisfies it. The
+shared install-time primitives (atomic write, backup, symlink refusal)
+now live in src.adapter.install instead of being co-located with
+codex-specific code.
 """
 
 from __future__ import annotations
@@ -16,11 +22,23 @@ from __future__ import annotations
 from importlib import resources
 from pathlib import Path
 
+from src.adapter.install import (
+    atomic_write_text,
+    backup_existing,
+    refuse_if_symlink_chain,
+)
+
 # Canonical Codex path per https://developers.openai.com/codex/skills:
 #   $REPO_ROOT/.agents/skills/<skill-name>/SKILL.md
 CODEX_SKILL_REL_PATH = Path(".agents/skills/plugin-harness/SKILL.md")
 
 # Package path of the bundled SKILL.md within the source tree.
+# PR #26 LLM review (🟠 major #3): the previous version relied on the
+# filesystem fallback because codex_skills/ had no __init__.py and the
+# repo had no pyproject.toml `[tool.setuptools.package-data]` entry.
+# Adding __init__.py files at every level makes the package importable
+# via importlib.resources; the filesystem fallback remains as a
+# belt-and-suspenders for editable installs that haven't been built.
 _SKILL_PACKAGE = "src.adapter.codex_skills.plugin-harness"
 _SKILL_RESOURCE = "SKILL.md"
 
@@ -59,28 +77,36 @@ def _bundled_skill_text() -> str:
         return fs.read_text(encoding="utf-8")
 
 
-def register_codex(project_dir: Path) -> Path:
-    """Install the plugin-harness Codex skill into `project_dir`.
+class CodexAdapter:
+    """Installs the plugin-harness skill into a Codex project.
 
-    Writes exactly one file: `<project_dir>/.agents/skills/plugin-harness/SKILL.md`,
-    the path Codex scans for project-level skills. Re-running this function
-    overwrites the same file (idempotent — no duplicates).
-
-    Parameters
-    ----------
-    project_dir:
-        The repository root where Codex should discover the skill. Must
-        exist or be writable; parent directories are created as needed.
-
-    Returns
-    -------
-    pathlib.Path
-        Absolute path to the written SKILL.md.
+    Satisfies the `Adapter` Protocol from src.adapter. Idempotent:
+    re-running `register(project_dir)` produces the same end state
+    as a fresh install (same content, prior version backed up).
     """
-    target = Path(project_dir) / CODEX_SKILL_REL_PATH
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(_bundled_skill_text(), encoding="utf-8")
-    return target
+
+    def register(self, project_dir: Path) -> Path:
+        target = Path(project_dir) / CODEX_SKILL_REL_PATH
+        # Defense-in-depth: refuse symlinks BEFORE creating any directory.
+        # Otherwise mkdir would materialize attacker-controlled parent
+        # dirs (PR #26 round 7: closes the partial-state gap).
+        refuse_if_symlink_chain(target, project_root=Path(project_dir))
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if target.is_file():
+            backup_existing(target)  # preserve prior content
+        content = _bundled_skill_text()
+        atomic_write_text(target, content)
+        return target
 
 
-__all__ = ["register_codex", "CODEX_SKILL_REL_PATH"]
+def register_codex(project_dir: Path) -> Path:
+    """Module-level convenience function matching the prior call shape.
+
+    Equivalent to `CodexAdapter().register(project_dir)`. Kept so
+    existing callers (tests, downstream scripts) can stay on the
+    free-function form.
+    """
+    return CodexAdapter().register(project_dir)
+
+
+__all__ = ["register_codex", "CODEX_SKILL_REL_PATH", "CodexAdapter"]
