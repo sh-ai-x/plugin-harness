@@ -184,17 +184,14 @@ def emit(state: SkillInterviewState, output_dir: Path) -> EmitResult:
         cc_dir.mkdir(parents=True, exist_ok=True)
         codex_dir.mkdir(parents=True, exist_ok=True)
 
-        # Idempotency: clear stale slug subtrees (different slugs from prior runs).
-        for stale_root in (cc_dir.parent, codex_dir.parent):
-            if stale_root.is_dir():
-                for child in stale_root.iterdir():
-                    if child.is_dir() and child.name != slug:
-                        for sub in sorted(child.rglob("*"), reverse=True):
-                            if sub.is_file():
-                                sub.unlink()
-                            elif sub.is_dir():
-                                sub.rmdir()
-                        child.rmdir()
+        # Atomic overwrite-in-place: `cc_path.write_text` and `codex_path.write_text`
+        # below replace the contents in place. We deliberately do NOT sweep
+        # sibling skill subtrees here — a re-run with a different slug must
+        # never destroy skills installed by prior runs (PR #40 review finding,
+        # CRITICAL, "Idempotency cleanup recursively deletes unrelated user skills").
+        # If a previous emit used a different slug, its subtree is left intact
+        # alongside the new emit's output. Both emit the same target paths for
+        # the same slug, so re-runs are still idempotent for the same slug.
 
         cc_path.write_text(cc_text, encoding="utf-8")
         codex_path.write_text(codex_text, encoding="utf-8")

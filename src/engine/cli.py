@@ -159,10 +159,16 @@ def _run_skill_create(args) -> int:
     emits dual-runtime SKILL.md files. With no --output-dir, exits 0
     after the interview completes (parity with the 0-mvp behavior of
     "interview complete; further actions separate").
+
+    Exit codes (PR #40 review fix):
+      0  — interview + (optional) emit complete
+      3  — user aborted via stdin (Ctrl-C / EOF)
+      4  — schema/validation failure on a submitted answer OR emit error
     """
     writer = make_writer(None)
     # skill_create requires a real stdin reader; tests pass one directly.
     from src.engine.modes.user_driven import default_stdin_reader
+    from src.schema.state import SchemaError, ValidationError
     reader = default_stdin_reader
 
     try:
@@ -174,6 +180,13 @@ def _run_skill_create(args) -> int:
     except UserAbortError as exc:
         _print(f"aborted: {exc}")
         return 3
+    except (SchemaError, ValidationError) as exc:
+        # PR #40 review (🟠 major): SchemaError/ValidationError propagate from
+        # run_skill_interview (no longer masked as UserAbortError). Map to
+        # exit 4 (validation failure) so callers can distinguish user
+        # abort (3) from validation rejection (4).
+        _print(f"incomplete: {exc}")
+        return 4
 
     if args.output_dir is not None:
         try:

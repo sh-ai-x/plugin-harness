@@ -97,39 +97,36 @@ def test_parity_bodies_are_byte_equal(two_runtime_artifacts):
     )
 
 
-def test_parity_frontmatter_keys_agree(two_runtime_artifacts):
-    """Frontmatter keys must agree across runtimes on the locked intersection."""
+def test_parity_required_top_level_keys_present(two_runtime_artifacts):
+    """Both runtimes' SKILL.md files must carry the locked minimum frontmatter:
+    `name` and `description`. Runtime-specific optional top-level keys
+    (e.g., Codex `metadata:`) are allowed and not compared — the kill
+    condition is body byte-equality, not frontmatter shape."""
     cc_path, codex_path = two_runtime_artifacts
     cc_text = cc_path.read_text(encoding="utf-8")
     codex_text = codex_path.read_text(encoding="utf-8")
-    # Parse just the first frontmatter block (between first two --- markers)
     import re
     cc_fm = re.match(r"^---\s*\n(.+?)\n---\s*\n", cc_text, re.DOTALL)
     codex_fm = re.match(r"^---\s*\n(.+?)\n---\s*\n", codex_text, re.DOTALL)
     assert cc_fm is not None, f"could not parse CC frontmatter in {cc_text!r}"
     assert codex_fm is not None, f"could not parse Codex frontmatter in {codex_text!r}"
-    cc_keys = {
-        k.strip()
+    cc_top_keys = {
+        line.split(":", 1)[0].strip()
         for line in cc_fm.group(1).splitlines()
-        for k in [line.split(":", 1)[0]]
-        if ":" in line
+        if ":" in line and not line.startswith((" ", "\t"))
     }
-    codex_keys = {
-        k.strip()
+    codex_top_keys = {
+        line.split(":", 1)[0].strip()
         for line in codex_fm.group(1).splitlines()
-        for k in [line.split(":", 1)[0]]
-        if ":" in line
+        if ":" in line and not line.startswith((" ", "\t"))
     }
-    # Required for both: name and description.
-    assert "name" in cc_keys and "description" in cc_keys
-    assert "name" in codex_keys and "description" in codex_keys
-    # No key may appear in one and not the other unless it's runtime-specific.
-    LOCKED_INTERSECTION = {"name", "description"}
-    RUNTIME_OPTIONAL = {"metadata"}  # Codex may have it
-    diff_cc_only = (cc_keys - codex_keys) - RUNTIME_OPTIONAL
-    diff_codex_only = (codex_keys - cc_keys) - RUNTIME_OPTIONAL
-    assert not diff_cc_only, f"CC-only frontmatter keys without schema support: {diff_cc_only}"
-    assert not diff_codex_only, f"Codex-only frontmatter keys without schema support: {diff_codex_only}"
+    # Locked minimum: name + description. Missing either → fail.
+    for required in ("name", "description"):
+        assert required in cc_top_keys, f"CC missing required top-level key {required!r}"
+        assert required in codex_top_keys, f"Codex missing required top-level key {required!r}"
+    # Both files also validate against step-0's vendored schemas (covered by
+    # `test_parity_both_files_validate_against_their_schemas` above); that
+    # is the structural contract. This test asserts the minimum frontmatter.
 
 
 def test_parity_no_devkit_substring_in_either_runtime(two_runtime_artifacts):

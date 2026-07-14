@@ -47,10 +47,17 @@ def _parse_frontmatter(md_text: str) -> dict:
 
     Supports the subset used by Claude Code and Codex skills:
       - top-level `key: value` (scalar string by default)
+      - top-level `key:` followed by indented child `key: value` lines
+        (the parent becomes a dict; children are merged into it)
       - single-line JSON array/object value (e.g. `metadata: {"k":"v"}`)
-      - indented `key: value` lines (collected under last top-level key)
 
     Returns an empty dict if the file has no opening `---` marker.
+
+    PR #40 review (🟠 major, followup fix): previously, a top-level
+    `metadata:` (no scalar value) was rendered as the empty string
+    `""`, so indented children were silently dropped. Now: when a
+    top-level key has no scalar value AND indented children follow,
+    we initialize the key as an empty dict and merge children into it.
     """
     lines = md_text.splitlines()
     if not lines or not _FRONTMATTER_OPEN.match(lines[0]):
@@ -59,6 +66,7 @@ def _parse_frontmatter(md_text: str) -> dict:
     out: dict = {}
     current_top: str | None = None
     closed = False
+    has_indented_children_remaining = False
     for raw in lines[1:]:
         if _FRONTMATTER_OPEN.match(raw):
             closed = True
@@ -72,14 +80,27 @@ def _parse_frontmatter(md_text: str) -> dict:
         if not raw.startswith((" ", "\t")):
             # top-level key
             current_top = key
-            out[key] = _coerce_scalar(value)
+            if value == "":
+                # defer: an empty value at a top-level key may be a
+                # nested-block opener; do not assign until we know.
+                out[key] = None  # sentinel
+            else:
+                out[key] = _coerce_scalar(value)
         else:
-            # indented child of current_top; collect into dict at that key
+            has_indented_children_remaining = True
+            # Indented child. Promote a pending None parent to a dict.
+            if current_top is not None and out.get(current_top) is None:
+                out[current_top] = {}
+            # Indented child of current_top; collect into dict at that key
             if current_top is None or not isinstance(out.get(current_top), dict):
                 continue
             out[current_top][key] = _coerce_scalar(value)
     if not closed:
         return {}
+    # Drop sentinel parents that never received indented children — they
+    # were empty top-level scalars after all.
+    for k in [k for k, v in out.items() if v is None]:
+        del out[k]
     return out
 
 

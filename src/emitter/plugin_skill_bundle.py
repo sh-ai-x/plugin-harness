@@ -47,7 +47,16 @@ class PluginBundleResult:
 
 
 def _render_cc_skill(name: str, description: str, body: str) -> str:
-    """Render the CC-layout SKILL.md frontmatter + body."""
+    """Render the CC-layout SKILL.md frontmatter + body.
+
+    Frontmatter shape (CC, locked):
+        ---
+        name: <slug>
+        description: <escaped purpose>
+        ---
+
+    No `metadata:` block — CC's spec does not consume one.
+    """
     return (
         "---\n"
         f"name: {name}\n"
@@ -58,11 +67,33 @@ def _render_cc_skill(name: str, description: str, body: str) -> str:
 
 
 def _render_codex_skill(name: str, description: str, body: str) -> str:
-    """Render the Codex-layout SKILL.md frontmatter + body (no metadata block)."""
+    """Render the Codex-layout SKILL.md frontmatter + body.
+
+    Frontmatter shape (Codex, locked; PR #40 review fix — byte-diverges
+    from `_render_cc_skill` via a `metadata:` block):
+
+        ---
+        name: <slug>
+        description: <escaped purpose>
+        metadata:
+          openai:
+            slug: <slug>
+            dual_runtime: true
+        ---
+
+    The `metadata:` block is the locked Codex-specific divergence per the
+    `dual-runtime parity` carry-forward in `PRD.md`. Both bodies stay
+    byte-identical (the parity kill condition); only the frontmatter
+    shape diverges structurally.
+    """
     return (
         "---\n"
         f"name: {name}\n"
         f"description: {description}\n"
+        "metadata:\n"
+        "  openai:\n"
+        f"    slug: {name}\n"
+        "    dual_runtime: true\n"
         "---\n\n"
         f"# {name}\n\n{body}\n"
     )

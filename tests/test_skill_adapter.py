@@ -45,9 +45,19 @@ def test_register_cc_skill_idempotent(tmp_path):
 
 
 def test_register_cc_skill_unknown_name_raises(tmp_path):
+    """PR #40 review (🟠 major): name is allowlist-validated BEFORE any path
+    is constructed, blocking path traversal. Unknown names raise ValueError."""
     from src.adapter.cc import register_cc_skill
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(ValueError):
         register_cc_skill("not-a-real-skill", tmp_path)
+
+
+def test_register_cc_skill_rejects_path_traversal_attempt(tmp_path):
+    """A name containing `../` is rejected by the allowlist even if a
+    template with that name happened to exist on disk."""
+    from src.adapter.cc import register_cc_skill
+    with pytest.raises(ValueError):
+        register_cc_skill("../../../etc/passwd", tmp_path)
 
 
 def test_register_cc_skill_no_devkit_in_installed_file(tmp_path):

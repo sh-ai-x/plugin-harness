@@ -136,37 +136,46 @@ def run_skill_interview(
         try:
             state.set_answer(question["id"], raw)
             state.advance()
-        except (SchemaError, ValidationError) as exc:
-            raise UserAbortError(
-                f"skill_create answer for {question['id']!r} failed: {exc}"
-            ) from exc
+        except (SchemaError, ValidationError):
+            # PR #40 review (🟠 major): Do NOT mask state errors as UserAbortError.
+            # `run_interview` translates state errors to InterviewIncompleteError
+            # (mapped to exit 4 at the CLI); we follow the same convention here
+            # so the CLI in `_run_skill_create` can map these to exit 4 (validation
+            # failure), not exit 3 (user abort). UserAbortError is reserved for
+            # the stdin-reader signal.
+            raise
+
     return state
 
 
 # ---- mode registration (consumed by the engine) ----
 
 def _setup_skill_create(_make_reader, _make_writer, _make_tool_surface):
-    """No-op factory: skill_create has no per-mode reader/surface; cli.py
-    passes `stdin_reader` directly to `run_skill_interview`."""
+    """No-op factory: skill_create uses the same reader/surface machinery
+    as `user` mode (one line per question via stdin)."""
     return None, None, None
 
 
+# PR #40 review fix: register a real (non-poisoned) MODE_DISPATCH entry for
+# `skill_create`. The 0-mvp test `test_mode_dispatch_registers_both_modes`
+# asserts every name in MODES has a MODE_DISPATCH entry. cli.py dispatches
+# skill_create through `run_interview(questions=SKILL_QUESTIONS, ...)`,
+# which iterates the question list passed in (NOT the 5-question default
+# `QUESTIONS`) and dispatches each question to the registered handler.
 def _skill_create_per_question(question, idea, stdin_reader, _tool_surface):
-    """Per-question handler for the 'skill_create' mode (used by registry).
+    """Per-question handler for skill_create mode.
 
-    Unused in practice — cli.py dispatches directly to run_skill_interview.
-    Provided so MODE_DISPATCH has an entry; raises if invoked.
+    Reads one line per SKILL_QUESTIONS item via `stdin_reader`. The runner
+    (run_interview) passes each question dict and the same stdin_reader
+    the cli.py / caller configured. Returns the raw answer text.
     """
-    raise RuntimeError(
-        "skill_create is dispatched by cli.py via run_skill_interview; "
-        "MODE_DISPATCH entry exists for registry completeness only"
-    )
+    if stdin_reader is None:
+        raise UserAbortError("'skill_create' mode requires stdin_reader")
+    return stdin_reader(question["prompt"])
 
 
-# Imports happen at the bottom so that the per-mode registration calls fire
-# after register_mode / register_reader / register_surface are defined.
-from src.engine.modes import register_mode, register_reader, register_surface  # noqa: E402
+# Imports at the bottom so the registration call fires after `register_mode`
+# is defined.
+from src.engine.modes import register_mode  # noqa: E402
 
 register_mode("skill_create", _skill_create_per_question)
-register_reader("skill_create", lambda override: override)  # cli.py provides its own reader
-register_surface("skill_create", lambda override: None)
