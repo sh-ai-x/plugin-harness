@@ -1,11 +1,13 @@
 # plugin-harness
 
-> 5-question interview → dual-runtime (Claude Code + Codex) plugin emitter.
+> 5-question interview → structured idea plan → dual-runtime (Claude Code + Codex) plugin emitter.
 
-A CLI that interviews you through five fixed questions about an idea, assembles
-a structured idea plan, and emits the plugin files in a layout that installs
-identically in [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
-and [Codex](https://github.com/openai/codex). Built for non-coders who need to
+A CLI that interviews you through five fixed questions about an idea and
+produces a structured idea plan (final stdout line: `complete`). The same
+engine powers a dual-runtime emitter that lays out the resulting plugin files
+in a structure that installs identically in
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code) and
+[Codex](https://github.com/openai/codex). Built for non-coders who need to
 operationalize an AI workflow for a team without hand-editing `plugin.json`
 and `SKILL.md`.
 
@@ -14,7 +16,7 @@ and `SKILL.md`.
   thresholds are the product surface — see `src/schema/questions.py`.
 - **Modes:** `user` (interactive answers) or `ai-research` (runtime tool
   surface drafts answers from a one-line idea).
-- **Emits:** Codex layout (`src/.codex-plugin/plugin.json`,
+- **Emits (downstream):** Codex layout (`src/.codex-plugin/plugin.json`,
   `src/skills/<slug>/SKILL.md`, `src/.mcp.json`, `README.md`) plus Claude
   Code slash-command + skill adapters that install alongside.
 
@@ -108,9 +110,11 @@ Client-side: opt into the local pre-push hook with
 ## Contributing
 
 Per `.claude/rules/git-workflow.md`, every change goes on a fresh worktree +
-branch (`<type>/<slug>`, e.g. `fix/cli-nameerror`, `feat/new-mode`). Direct
-commits to `main` are blocked by `hooks/git-guard.sh`; edits in the main
-checkout are blocked by `hooks/worktree-guard.sh`.
+branch (`<type>/<slug>`, e.g. `fix/cli-nameerror`, `feat/new-mode`). The
+project ships three enforcement hooks in `hooks/`:
+- `worktree-guard.sh` (PreToolUse Edit/Write) — hard-blocks edits in the main checkout.
+- `task-detector.sh` (UserPromptSubmit) — early-warning nudge when new-task intent is detected in the main checkout.
+- `session-start-check.sh` (SessionStart) — gentle nudge when the session starts in the main checkout.
 
 PR title: `<type>(<scope>): <subject>` (Conventional Commits). Body must
 include a quoted test plan with exit codes / test counts.
