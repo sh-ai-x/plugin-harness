@@ -1,7 +1,7 @@
 """CLI entrypoint for the interview engine.
 
 Usage:
-    python -m src.engine.cli new "<one-line idea>" [--mode user|ai-research]
+    python -m src.engine.cli new "<one-line idea>" [--mode user|ai-research|skill_create]
 
 Exit codes:
     0  — interview completed; final line of stdout is "complete"
@@ -36,6 +36,8 @@ from src.engine.modes import (
     setup_surface,
 )
 from src.engine.modes.user_driven import make_writer  # writer is shared across modes
+from src.engine.modes.skill_create import SkillInterviewState, run_skill_interview
+from src.skill_schema.prompts import SKILL_QUESTIONS
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -59,7 +61,18 @@ def build_parser() -> argparse.ArgumentParser:
         "--mode",
         choices=MODES,
         default="user",
-        help="Interview mode: 'user' (stdin) or 'ai-research' (tool surface).",
+        help="Interview mode: 'user' (stdin), 'ai-research' (tool surface), or 'skill_create' (3-question skill authoring + dual SKILL.md emission).",
+    )
+    new_cmd.add_argument(
+        "--output-dir",
+        default=None,
+        help="Output directory for emitted artifacts (skill_create only). Required for skill_create when stdin is not a TTY.",
+    )
+    new_cmd.add_argument(
+        "--skill-slug",
+        action="append",
+        default=[],
+        help="Skill slug name to bundle under both .claude/skills/ and .codex/skills/ inside --output-dir (plugin_create only). May be repeated.",
     )
     return parser
 
@@ -104,6 +117,16 @@ def main(argv: Optional[List[str]] = None) -> int:
         _print(f"invalid choice: {args.mode!r} (choose from {MODES})")
         return 2
 
+    # 1-skill-creator: skill_create runs a 3-question interview and emits
+    # dual SKILL.md files; dispatch BEFORE the 5-question path so it
+    # never accidentally runs through the 0-mvp QUESTIONS list.
+    if args.mode == "skill_create":
+        return _run_skill_create(args)
+
+    if args.skill_slug and not args.output_dir:
+        _print("--skill-slug requires --output-dir")
+        return 2
+
     state = InterviewState()
     writer = make_writer(None)
     reader = setup_reader(args.mode)
@@ -124,6 +147,42 @@ def main(argv: Optional[List[str]] = None) -> int:
     except InterviewIncompleteError as exc:
         _print(f"incomplete: {exc}")
         return 4
+
+    _print("complete")
+    return 0
+
+
+def _run_skill_create(args) -> int:
+    """CLI dispatch for the skill_create sub-mode.
+
+    Runs the 3-question interview and, when --output-dir is provided,
+    emits dual-runtime SKILL.md files. With no --output-dir, exits 0
+    after the interview completes (parity with the 0-mvp behavior of
+    "interview complete; further actions separate").
+    """
+    writer = make_writer(None)
+    # skill_create requires a real stdin reader; tests pass one directly.
+    from src.engine.modes.user_driven import default_stdin_reader
+    reader = default_stdin_reader
+
+    try:
+        state = run_skill_interview(
+            args.idea,
+            stdin_reader=reader,
+            stdout_writer=writer,
+        )
+    except UserAbortError as exc:
+        _print(f"aborted: {exc}")
+        return 3
+
+    if args.output_dir is not None:
+        try:
+            from pathlib import Path
+            from src.emitter.skill import emit_skill, EmitError
+            emit_skill(state, Path(args.output_dir))
+        except EmitError as exc:
+            _print(f"emit error: {exc}")
+            return 4
 
     _print("complete")
     return 0

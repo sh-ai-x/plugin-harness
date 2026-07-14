@@ -1,0 +1,5 @@
+{
+  "purpose": "Demonstration skill that converts a user handoff into an interview transcript",
+  "examples": "Invoke via /skill-creator slash command in CC and Codex runtimes; emits dual SKILL.md",
+  "success-criteria": "Both emitted SKILL.md files validate against the vendored schemas from step 0 and pass the dual-runtime parity check (CC body == Codex body byte-equal, only frontmatter shape differs)"
+}

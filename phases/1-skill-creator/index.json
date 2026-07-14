@@ -1,0 +1,67 @@
+{
+  "schema_version": "1.0.0",
+  "phase": "1-skill-creator",
+  "project": "plugin-harness",
+  "created_at": "2026-07-14T00:00:00Z",
+  "worktree": "feat/skill-plugin-creator",
+  "ambiguity_score": 3,
+  "value_score": 66.67,
+  "evidence_count": 3,
+  "steps": [
+    {
+      "step": 0,
+      "name": "skill-spec-schema",
+      "title": "Dual-runtime skill spec + validators",
+      "status": "completed",
+      "ambiguity_delta": -3.0,
+      "started_at": "2026-07-14T20:56:16+0900",
+      "completed_at": "2026-07-14T21:14:00+0900",
+      "duration_seconds": 1064.0,
+      "summary": "Created docs/{cc,codex}-skill.schema.json + src/skill_schema/{__init__,loader,validator,prompts}.py + 5 fixtures + tests/test_skill_schema.py (10 tests pass). AC1-AC5 all exit 0."
+    },
+    {
+      "step": 1,
+      "name": "skill-sub-mode",
+      "title": "skill-creator: 3-question interview + dual SKILL.md emitter",
+      "status": "completed",
+      "ambiguity_delta": -2.0,
+      "started_at": "2026-07-14T21:14:00+0900",
+      "completed_at": "2026-07-14T21:30:00+0900",
+      "duration_seconds": 960.0,
+      "summary": "Added mode=skill_create via registry (no forking). src/skill_schema/prompts.py (3Q) + src/engine/modes/skill_create.py + SkillInterviewState + src/emitter/skill.py emit_skill() + cli.py dispatch. tests/test_skill_sub_mode.py (11 tests) + tests/test_skill_prompts.py (7 tests) all pass."
+    },
+    {
+      "step": 2,
+      "name": "plugin-sub-mode",
+      "title": "plugin-creator: 5-question interview + plugin.json + dual-skill bundle emitter",
+      "status": "completed",
+      "ambiguity_delta": -1.0,
+      "started_at": "2026-07-14T21:30:00+0900",
+      "completed_at": "2026-07-14T21:36:00+0900",
+      "duration_seconds": 360.0,
+      "summary": "Added --skill-slug to existing CLI; src/emitter/plugin_skill_bundle.py wraps 0-mvp's codex.emit and additionally emits dual-runtime skill bundle (CC + Codex). Reuses 0-mvp's 5-question schema and emitter unchanged. tests/test_plugin_sub_mode.py (8 tests) all pass."
+    },
+    {
+      "step": 3,
+      "name": "adapter-register",
+      "title": "CC + Codex adapters register skill-creator and plugin-creator as native skills",
+      "status": "completed",
+      "ambiguity_delta": -0.5,
+      "started_at": "2026-07-14T21:36:00+0900",
+      "completed_at": "2026-07-14T21:42:00+0900",
+      "duration_seconds": 360.0,
+      "summary": "Added SKILL.md templates under src/adapter/{cc,codex}_skills/{skill,plugin}-creator/ + register_cc_skill() and register_codex_skill() siblings. 0-mvp register_cc/register_codex signatures unchanged (backward-compat verified). tests/test_skill_adapter.py (15 tests) all pass."
+    },
+    {
+      "step": 4,
+      "name": "e2e-parity",
+      "title": "E2E + dual-runtime parity test",
+      "status": "completed",
+      "ambiguity_delta": -0.5,
+      "started_at": "2026-07-14T21:42:00+0900",
+      "completed_at": "2026-07-14T21:48:00+0900",
+      "duration_seconds": 360.0,
+      "summary": "tests/e2e/test_dual_runtime_parity.py (7 tests, kill-condition checks) + tests/e2e/test_skill_creator_e2e.py (4 tests). The kill condition (CC SKILL.md body == Codex SKILL.md body byte-equal, only frontmatter shape differs) is verified. scripts/ci-local.sh → exit 0 (246 tests + 1 xfailed pass)."
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 """Claude Code adapter — install-time surface for the plugin-harness engine.
 
 The adapter is a thin shell wrapper. It does not modify runtime behavior of the
-engine; it only copies the two template files (slash command + skill) into the
+engine; it only copies the template files (slash command + skill) into the
 target project so Claude Code can invoke ``python -m src.engine.cli``.
 """
 from __future__ import annotations
@@ -35,3 +35,37 @@ def register_cc(project_dir: Path) -> None:
 
     shutil.copyfile(_COMMAND_TEMPLATE, command_target)
     shutil.copyfile(_SKILL_TEMPLATE, skill_target)
+
+
+# ---- 1-skill-creator: skill-creator and plugin-creator install siblings ----
+
+from src.adapter.install import atomic_write_text, refuse_if_symlink_chain  # noqa: E402
+
+
+def _cc_skill_template(name: str) -> Path:
+    """Locate the bundled CC SKILL.md template for `name`.
+
+    Raises FileNotFoundError if the template does not exist.
+    """
+    candidate = _PACKAGE_DIR / "cc_skills" / name / "SKILL.md"
+    if not candidate.is_file():
+        raise FileNotFoundError(f"bundled CC skill template not found: {candidate}")
+    return candidate
+
+
+def register_cc_skill(name: str, project_dir: Path) -> Path:
+    """Install a CC skill template (skill-creator / plugin-creator) into a project.
+
+    Creates (or overwrites):
+
+        ``<project_dir>/.claude/skills/<name>/SKILL.md``
+
+    Idempotent on re-run. Returns the path to the installed SKILL.md.
+    """
+    project_dir = Path(project_dir)
+    target = project_dir / ".claude" / "skills" / name / "SKILL.md"
+    refuse_if_symlink_chain(target, project_root=project_dir)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    template = _cc_skill_template(name)
+    shutil.copyfile(template, target)
+    return target

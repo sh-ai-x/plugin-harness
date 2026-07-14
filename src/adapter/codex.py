@@ -64,6 +64,60 @@ def _bundled_skill_via_filesystem() -> Path | None:
     return candidate if candidate.is_file() else None
 
 
+# ---- 1-skill-creator: skill-creator / plugin-creator install siblings ----
+
+_CODEX_SKILL_REL_PATHS = {
+    # name → relative install path under the project root
+    "skill-creator": Path(".codex/skills/skill-creator/SKILL.md"),
+    "plugin-creator": Path(".codex/skills/plugin-creator/SKILL.md"),
+}
+
+_SKILL_RESOURCE_PACKAGES = {
+    "skill-creator": "src.adapter.codex_skills.skill-creator",
+    "plugin-creator": "src.adapter.codex_skills.plugin-creator",
+}
+
+
+def _read_codex_skill(name: str) -> str:
+    """Read the bundled Codex SKILL.md for `name` from package data."""
+    pkg = _SKILL_RESOURCE_PACKAGES[name]
+    try:
+        return (
+            resources.files(pkg).joinpath("SKILL.md").read_text(encoding="utf-8")
+        )
+    except (ModuleNotFoundError, FileNotFoundError):
+        here = Path(__file__).resolve().parent
+        candidate = here / "codex_skills" / name / "SKILL.md"
+        if not candidate.is_file():
+            raise FileNotFoundError(f"bundled Codex skill {name!r} not found")
+        return candidate.read_text(encoding="utf-8")
+
+
+def register_codex_skill(name: str, project_dir: Path) -> Path:
+    """Install a Codex skill template (skill-creator / plugin-creator) into a project.
+
+    Creates (or overwrites):
+
+        ``<project_dir>/.codex/skills/<name>/SKILL.md``
+
+    Idempotent on re-run: same target path is overwritten in place; no
+    `.bak.<timestamp>` files are emitted (unlike the canonical
+    `register_codex` plugin install which backs up before writing).
+    Returns the path to the installed SKILL.md.
+    """
+    if name not in _CODEX_SKILL_REL_PATHS:
+        raise KeyError(
+            f"unknown codex skill {name!r}; expected one of {list(_CODEX_SKILL_REL_PATHS)}"
+        )
+    project_dir = Path(project_dir)
+    target = project_dir / _CODEX_SKILL_REL_PATHS[name]
+    refuse_if_symlink_chain(target, project_root=project_dir)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    content = _read_codex_skill(name)
+    atomic_write_text(target, content)
+    return target
+
+
 def _bundled_skill_text() -> str:
     """Resolve the bundled SKILL.md contents (package data or filesystem)."""
     try:
