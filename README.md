@@ -45,11 +45,16 @@ Exit codes:
 |-----:|---------|
 | 0 | Interview completed; final stdout line is `complete` |
 | 2 | Invalid CLI args |
-| 3 | User aborted (Ctrl-C / EOF / empty input) |
+| 3 | User aborted (Ctrl-C / EOF on stdin) — empty input exits 4 (validation failure) |
 | 4 | Validation failure on a submitted answer |
 
-From inside Claude Code or Codex, invoke the installed slash command / skill
-(`/plugin-harness …`) — both adapters delegate to the same engine entry point.
+The CLI runs the interview and prints `complete` on stdout; downstream
+plan assembly + plugin-file emission are library calls
+(`src/assembler/plan`, `src/emitter/codex`) that callers invoke separately.
+The Claude Code + Codex slash-command / skill adapters in `src/adapter/`
+wrap that same engine entry point and register themselves only inside
+their respective runtime hosts — `pip install -e .` does **not** register
+a `/plugin-harness` command.
 
 ## Architecture
 
@@ -62,7 +67,7 @@ src/
 └── adapter/        runtime surfaces:
     ├── cc.py       Claude Code slash command + skill
     ├── codex.py    Codex skill
-    └── install.py  cross-runtime installer
+    └── install.py  shared install-time primitives (atomic write, backup, symlink-chain refuse)
 ```
 
 The engine is one process; the adapters are thin wrappers that install the
@@ -75,7 +80,7 @@ Codex `SKILL.md` body byte-for-byte, modulo front-matter.
 ```bash
 bash scripts/test.sh       # pytest tests/ (installs pytest/jinja2/jsonschema if missing)
 bash scripts/e2e.sh        # full dual-runtime pipeline: schema → engine → emitter → adapters
-bash scripts/ci-local.sh   # local equivalent of the GitHub Actions `validate` job
+bash scripts/ci-local.sh   # local CI: validate + test (mirrors what .github/workflows/ci.yml runs)
 bash scripts/smoke.sh      # lightweight smoke check
 ```
 
@@ -98,8 +103,10 @@ Test layout:
 
 `.github/workflows/ci.yml` runs three jobs:
 
-- **branch-policy** — fail-closed on direct push to `main` (requires an
-  associated merged PR). Mirrored client-side by `.githooks/pre-push`.
+- **branch-policy** — fail-closed on direct push to `main` whose commit
+  has no associated PR (probes `GET /repos/{owner}/{repo}/commits/{sha}/pulls`;
+  empty array means "direct push bypassing review"). Mirrored client-side
+  by `.githooks/pre-push`.
 - **test** — `bash scripts/test.sh` on `pull_request` and `workflow_dispatch`.
 - **validate** — `python3 scripts/validate.py` on the same triggers.
 
