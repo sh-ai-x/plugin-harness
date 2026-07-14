@@ -46,12 +46,20 @@ def run_interview(
     stdin_reader: Optional[StdinReader] = None,
     stdout_writer: Optional[StdoutWriter] = None,
     tool_surface: Optional[ToolSurface] = None,
+    questions: Optional[tuple] = None,
 ) -> InterviewState:
-    """Drive the 5-question interview against `state`, returning it when complete.
+    """Drive an interview against `state`, returning it when complete.
+
+    The 0-mvp behavior (5 questions, hardcoded) is the default. Pass
+    `questions=...` to override the question list — used by the
+    `skill_create` sub-mode (3 questions). `state` is duck-typed:
+    any object with `set_answer(qid, raw)` and `advance()` works.
 
     Mode dispatch:
         - "user": reads one line per question via stdin_reader; writes prompt via stdout_writer.
         - "ai-research": asks tool_surface.draft_answer(question, idea) for each question.
+        - "skill_create": registered for registry completeness; cli.py dispatches
+                          directly to run_skill_interview (no per-question dispatch needed).
 
     Either mode raises:
         - ValueError for an unknown mode (programming error, not user input).
@@ -71,7 +79,12 @@ def run_interview(
     # src/engine/modes/__init__.py as the single source of truth.
     from src.engine.modes import MODES
     if mode not in MODES:
-        raise ValueError(f"unknown mode {mode!r}; expected 'user' or 'ai-research'")
+        raise ValueError(f"unknown mode {mode!r}; expected one of {MODES}")
+
+    # 1-skill-creator: allow callers (cli.py, library) to pass an alternate
+    # question list. Defaults to the 0-mvp QUESTIONS so existing callers
+    # are unaffected.
+    q_list = questions if questions is not None else QUESTIONS
 
     # PR #22 round 12 (🟡 minor): validate per-mode dependencies BEFORE
     # any prompt is emitted. The per-question dispatch raises
@@ -83,7 +96,7 @@ def run_interview(
     if mode == "ai-research" and tool_surface is None:
         raise ValueError("'ai-research' mode requires tool_surface")
 
-    for question in QUESTIONS:
+    for question in q_list:
         _prompt(question, stdout_writer)
 
         # PR #22 round 11 (🟠 major): data-driven per-question dispatch

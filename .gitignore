@@ -32,3 +32,11 @@ venv/
 *.pem
 *.key
 secrets/
+
+# dev-kit runner artifacts (kept uncommitted; produced by harness-runner
+# at run time, not by hand). The runner writes phases/<name>/step<N>-output.json
+# for each step; we don't ship those as code.
+phases/**/step*-output.json
+
+# dev-kit cost-gate session state (per-session ledger; runtime only).
+.dev-kit/.cost-gate/

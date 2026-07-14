@@ -1,21 +1,46 @@
 {
   "schema_version": "1.0.0",
   "stage": "plan",
-  "phase": "0-mvp",
-  "project": "plugin-harness",
-  "created_at": "2026-07-08T23:50:00Z",
-  "safety_valve": 8,
-  "convergence": {
-    "evidence_count_threshold": 3,
-    "value_score_threshold": 3.0,
-    "ambiguity_score_threshold": 3
-  },
-  "cycles": [
-    {"n": 1, "evidence_count": 3, "value_score": 33.33, "ambiguity_score_before": 10, "ambiguity_score_after": 8, "narrowed_delta": -2, "knob": "scope", "question": "smallest 2-week version and the one number that moves?", "answer_source": "user-delegated", "answer_summary": "5-question CLI + assembler + emitter; time-to-first-team-plugin <= 30 min", "dedup_metric": null, "status": "narrowed"},
-    {"n": 2, "evidence_count": 3, "value_score": 33.33, "ambiguity_score_before": 8, "ambiguity_score_after": 5, "narrowed_delta": -3, "knob": "kill", "question": "what would make you kill it after launch?", "answer_source": "model-inferred", "answer_summary": "non-developer cannot complete interview + ship plugin under 30 min unaided", "dedup_metric": null, "status": "narrowed"},
-    {"n": 3, "evidence_count": 3, "value_score": 33.33, "ambiguity_score_before": 5, "ambiguity_score_after": 3, "narrowed_delta": -2, "knob": "user", "question": "second persona for canary cohort?", "answer_source": "user-stated-implicit", "answer_summary": "PM at 3-person growth team, non-coder; same archetype as marketing manager", "dedup_metric": null, "status": "narrowed"}
+  "phases": [
+    {
+      "phase": "0-mvp",
+      "project": "plugin-harness",
+      "created_at": "2026-07-08T23:50:00Z",
+      "safety_valve": 8,
+      "convergence": {
+        "evidence_count_threshold": 3,
+        "value_score_threshold": 3.0,
+        "ambiguity_score_threshold": 3
+      },
+      "cycles": [
+        {"n": 1, "evidence_count": 3, "value_score": 33.33, "ambiguity_score_before": 10, "ambiguity_score_after": 8, "narrowed_delta": -2, "knob": "scope", "question": "smallest 2-week version and the one number that moves?", "answer_source": "user-delegated", "answer_summary": "5-question CLI + assembler + emitter; time-to-first-team-plugin <= 30 min", "dedup_metric": null, "status": "narrowed"},
+        {"n": 2, "evidence_count": 3, "value_score": 33.33, "ambiguity_score_before": 8, "ambiguity_score_after": 5, "narrowed_delta": -3, "knob": "kill", "question": "what would make you kill it after launch?", "answer_source": "model-inferred", "answer_summary": "non-developer cannot complete interview + ship plugin under 30 min unaided", "dedup_metric": null, "status": "narrowed"},
+        {"n": 3, "evidence_count": 3, "value_score": 33.33, "ambiguity_score_before": 5, "ambiguity_score_after": 3, "narrowed_delta": -2, "knob": "user", "question": "second persona for canary cohort?", "answer_source": "user-stated-implicit", "answer_summary": "PM at 3-person growth team, non-coder; same archetype as marketing manager", "dedup_metric": null, "status": "narrowed"}
+      ],
+      "final": {"ambiguity_score": 3, "value_score": 33.33, "evidence_count": 3, "convergence_test": "PASS"},
+      "narrowing": [10, 8, 5, 3],
+      "status": "emitted"
+    },
+    {
+      "phase": "1-skill-creator",
+      "project": "plugin-harness",
+      "created_at": "2026-07-14T00:00:00Z",
+      "safety_valve": 8,
+      "convergence": {
+        "evidence_count_threshold": 3,
+        "value_score_threshold": 3.0,
+        "ambiguity_score_threshold": 3
+      },
+      "cycles": [
+        {"n": 1, "evidence_count": 3, "value_score": 66.67, "ambiguity_score_before": 10, "ambiguity_score_after": 7, "narrowed_delta": -3, "knob": "scope", "question": "smallest 2-week version given prior revert (266897b / 9e5583a)?", "answer_source": "user-delegated", "answer_summary": "3 sub-modes of plugin-harness CLI + 4 native skills; reuse 0-mvp schema/emitter without forking", "dedup_metric": null, "status": "narrowed"},
+        {"n": 2, "evidence_count": 3, "value_score": 66.67, "ambiguity_score_before": 7, "ambiguity_score_after": 5, "narrowed_delta": -2, "knob": "kill", "question": "what would make you kill it after launch?", "answer_source": "model-inferred", "answer_summary": "parity test: CC and Codex SKILL artifacts diverge; ship single-runtime only and defer dual", "dedup_metric": null, "status": "narrowed"},
+        {"n": 3, "evidence_count": 3, "value_score": 66.67, "ambiguity_score_before": 5, "ambiguity_score_after": 3, "narrowed_delta": -2, "knob": "user", "question": "first user + first click?", "answer_source": "user-stated-implicit", "answer_summary": "0-mvp marketer persona; first click = plugin-harness new --mode=skill_create", "dedup_metric": null, "status": "narrowed"}
+      ],
+      "final": {"ambiguity_score": 3, "value_score": 66.67, "evidence_count": 3, "convergence_test": "PASS"},
+      "narrowing": [10, 7, 5, 3],
+      "status": "emitted"
+    }
   ],
-  "final": {"ambiguity_score": 3, "value_score": 33.33, "evidence_count": 3, "convergence_test": "PASS"},
-  "narrowing": [10, 8, 5, 3],
+  "current_phase": "1-skill-creator",
   "status": "emitted"
 }
