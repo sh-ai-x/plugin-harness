@@ -137,39 +137,175 @@ interview entirely and produce the same artifacts programmatically.
 
 ## Install
 
-### Recommended — via marketplace (Claude Code)
+The repo is a Claude Code plugin published through a **self-hosted
+marketplace**. The plugin manifest lives at
+[`.claude-plugin/plugin.json`](.claude-plugin/plugin.json); the
+marketplace catalog entry is at
+[`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json);
+and a parallel Codex-side manifest is at
+[`.codex-plugin/plugin.json`](.codex-plugin/plugin.json). The three
+SKILL.md assets ship at repo-root
+[`skills/<name>/SKILL.md`](skills/) (Claude layout) and
+`skills/<name>/SKILL.codex.md` (Codex layout companion).
 
-The repo ships as a Claude Code plugin under
-[`.claude-plugin/plugin.json`](.claude-plugin/plugin.json) with a
-[self-hosted marketplace entry](.claude-plugin/marketplace.json). To
-install plugin-harness in your Claude Code:
+The full install has **two parts**: (1) the user adds the marketplace
+once; (2) the user installs the plugin from the marketplace. Both
+happen from the Claude Code CLI.
+
+### 1. Add the self-hosted marketplace (one-time, per machine)
+
+Before running the `add` command: open
+<https://github.com/sh-ai-x/plugin-harness> in a browser and confirm the
+URL is the official plugin-harness repo. Self-hosted marketplace entries
+land the user's machine in whatever repo the URL points to by design —
+a typo'd URL could land you in an arbitrary repo. Verify first.
 
 ```bash
-# one-time — add the marketplace
+# Default (mutable ref): the marketplace catalog's plugins[].source.ref
+# is 'main', so the install resolves to whatever main points at right
+# now. Recommended for users who just want the latest.
 claude plugin marketplace add https://github.com/sh-ai-x/plugin-harness
 
-# install the plugin
+# Pinned (deterministic): if you want a specific commit SHA (reproducible
+# install, supply-chain defense), clone the marketplace locally and add
+# the local path with --ref pinned to the SHA. The self-hosted
+# marketplace form accepts source.ref = "<git-sha>".
+#   git clone https://github.com/sh-ai-x/plugin-harness /tmp/ph-<sha>
+#   cd /tmp/ph-<sha> && git checkout <commit-sha>
+#   claude plugin marketplace add /tmp/ph-<sha>
+# This bypasses the mutable-`main` ref risk but trades it for a
+# stale-SHA risk — bump the SHA manually on each update.
+```
+
+Verify it registered:
+
+```bash
+claude plugin marketplace list
+# expect a line containing: sh-ai-x-plugins  https://github.com/sh-ai-x/plugin-harness
+```
+
+To remove the marketplace later (without uninstalling the plugin
+itself — the plugin is already on disk and survives marketplace removal):
+
+```bash
+claude plugin marketplace remove sh-ai-x-plugins
+```
+
+### 2. Install the plugin
+
+```bash
 claude plugin install plugin-harness
 ```
 
-After install, three skills become available as **namespaced slash
-commands**:
+> **Security:** Adding a marketplace trusts the marketplace catalog and
+> (after install) every plugin revision it resolves on `claude plugin
+> update`. `marketplace.json` ships with `source.ref: "main"` (a mutable
+> ref), so any merge to `main` is immediately served to users on the
+> next `update`. The version-bump workflow pins a SHA only on its own
+> future runs, not at user-install time. **Pin a marketplace SHA before
+> installing and verify it against a signed release tag** — branch refs
+> like `main` resolve to whatever the branch currently points at, so a
+> compromise of `main` would be served to every user on their next
+> update. The project has a follow-up plan to default `source.ref` to
+> a pinned SHA + signed-tag workflow. For the now-current workflow,
+> see the pinned-install variant in step 1 below, and verify the SHA at
+> <https://github.com/sh-ai-x/plugin-harness/commits/main> before
+> `claude plugin install`.
 
-- `/plugin-harness:plugin-harness` (or `/plugin-harness` if you installed
-  via skills-directory mode) — the 5-question plugin interview
-- `/plugin-harness:skill-creator` — 3-question skill interview
-- `/plugin-harness:plugin-creator` — plugin + skill bundle
+The CLI clones the repo (or pulls a vendored copy) and registers
+`plugin-harness` with Claude Code. After install, three skills become
+available as **namespaced slash commands**:
 
-Run `/reload-plugins` after install. To update: `claude plugin update
-plugin-harness`.
+| Slash command | What it does |
+|---|---|
+| `/plugin-harness:plugin-harness` | 5-question plugin interview → Codex-layout plugin |
+| `/plugin-harness:skill-creator` | 3-question skill interview → dual-runtime SKILL.md pair |
+| `/plugin-harness:plugin-creator` | 5-question plugin + dual-runtime skill bundle |
+| `/plugin-harness:new` | Primary CLI entry point: runs the interview engine with the flags you pass (`--mode user` / `--mode=skill_create` / `--mode=ai-research` / `--skill-slug <slug>` / `--output-dir <dir>`) |
 
-Dev-mode install (without marketplace) for plugin-harness contributors:
+Namespacing follows the Claude plugin convention: `<plugin-name>:<skill-name>`
+to avoid collisions across plugins.
+
+### 3. Verify the install
 
 ```bash
-claude --plugin-dir /path/to/plugin-harness/.claude-plugin
+# Reload the plugin registry (always do this after install/update)
+claude plugin reload
+
+# Confirm the plugin is loaded
+claude plugin list
+# expect a line containing: plugin-harness  <version>  ...
+
+# Confirm all 4 slash commands are visible
+/help
+# search for: /plugin-harness:plugin-harness  /plugin-harness:skill-creator
+#            /plugin-harness:plugin-creator  /plugin-harness:new
 ```
 
-### Fallback — pip install (library path only)
+### 4. Update an existing install
+
+When the maintainer bumps the version (the
+[version-bump workflow](.github/workflows/version-bump.yml) does this
+on every merge to main), refresh your local install:
+
+```bash
+claude plugin update plugin-harness
+claude plugin reload
+```
+
+If `update` errors (rare; usually a permissions issue on the cache
+directory), uninstall + reinstall:
+
+```bash
+claude plugin uninstall plugin-harness
+claude plugin install plugin-harness
+```
+
+### 5. Uninstall
+
+```bash
+claude plugin uninstall plugin-harness
+```
+
+The plugin's runtime artifacts (`.claude/skills/plugin-harness:*/SKILL.md`,
+`.claude/commands/...`) are removed. The marketplace registration
+persists (a separate removal if you want it gone too — see step 1).
+
+### Dev-mode install (plugin-harness contributors)
+
+If you're editing the plugin-harness source itself, point Claude
+Code at the local checkout instead of the marketplace entry — this
+lets you test changes before cutting a release:
+
+```bash
+# from inside the plugin-harness repo
+claude --plugin-dir .
+```
+
+> **Security:** The `--plugin-dir` path is **auto-loaded by Claude Code at
+> session start** — including all `.claude-plugin/` directives (hooks,
+> MCP/LSP servers, monitors, `bin/`, agents, settings). Only run from a
+> verified checkout you trust. Inspect the `.claude-plugin/` tree
+> (especially `hooks/hooks.json` and `.mcp.json`) before running.
+
+The `--plugin-dir` flag (per
+[code.claude.com/docs/en/plugins](https://code.claude.com/docs/en/plugins))
+points Claude Code at a local plugin directory. It takes the directory
+**above** `.claude-plugin/` (i.e. the plugin root), not `.claude-plugin/`
+itself nor the manifest file. Use `/reload-plugins` after each code
+change.
+
+When your changes are ready, the workflow is:
+1. Run `bash scripts/ci-local.sh` (verifies tests + JSON manifests).
+2. Commit + push to main.
+3. The CI version-bump workflow
+   ([`.github/workflows/version-bump.yml`](.github/workflows/version-bump.yml))
+   patches the version + commit-pins the marketplace ref on every merge to
+   main. Users pick up the new version via `claude plugin update`.
+4. Users run `claude plugin update plugin-harness` to pull the new
+   version.
+
+### Fallback — `pip install` for the library path only
 
 ```bash
 python -m pip install -e .
@@ -181,9 +317,103 @@ Requires Python ≥ 3.10. Runtime deps (pinned in `pyproject.toml`):
 `pip install` does **not** install Claude or Codex skills by itself; it
 only gives you the library API + CLI. To get the bundled skills into a
 runtime skill directory, use the marketplace install above, or call
-`register_cc_skill` / `register_codex_skill` programmatically
-(see "Library API" below). The library install path is for users who
-want to integrate plugin-harness into their own Python tools.
+`register_cc_skill` / `register_codex_skill` programmatically (see
+"Library API" below). The library install path is for users who want
+to integrate plugin-harness into their own Python tools, not for
+everyday skill authoring.
+
+### Fallback — manual install (no marketplace, no pip)
+
+For users who can't or don't want to use `claude plugin marketplace add`
+yet (offline, CI restrictions, etc.), drop the three SKILL.md files
+into `~/.claude/skills/<name>/` by hand:
+
+```bash
+# from the plugin-harness repo root
+mkdir -p ~/.claude/skills/plugin-harness
+mkdir -p ~/.claude/skills/skill-creator
+mkdir -p ~/.claude/skills/plugin-creator
+# SECURITY: cp -n preserves any pre-existing SKILL.md in the target
+# directory. If the prior file was installed from a typosquatted
+# marketplace or a fork, cp -n keeps that file. To verify a clean
+# install, remove the target directory first (rm -rf
+# ~/.claude/skills/<name>) or inspect the existing file (cat
+# ~/.claude/skills/<name>/SKILL.md) before running the loop. To
+# clobber explicitly, replace cp -n with plain cp in the loop.
+cp -n skills/plugin-harness/SKILL.md  ~/.claude/skills/plugin-harness/
+cp -n skills/skill-creator/SKILL.md   ~/.claude/skills/skill-creator/
+cp -n skills/plugin-creator/SKILL.md  ~/.claude/skills/plugin-creator/
+```
+
+Then `/reload-plugins` in Claude Code. The skills appear as
+`/plugin-harness`, `/skill-creator`, `/plugin-creator` (unprefixed in
+this mode). Note: this is the install path BEFORE the marketplace was
+shipped; the marketplace install supersedes it.
+
+**`/plugin-harness:new` is NOT available in the manual install path.**
+That slash command requires the plugin's `commands/new.md` asset, which
+ships only in the plugin root directory (consumed by the marketplace
+install via `claude --plugin-dir` or `/plugin install`). The manual
+`cp` path gives you the three SKILL.md assets only; if you need the
+`/new` slash command, use the marketplace or dev-mode install.
+
+### Codex-side install
+
+Codex reads the same SKILL.md files (the `.codex.md` companions) from
+a parallel location. Per
+[learn.chatgpt.com/docs/build-skills](https://learn.chatgpt.com/docs/build-skills),
+Codex's user-level canonical path is `$HOME/.agents/skills/<name>/` (NOT
+`~/.codex/skills/`, which was an earlier convention):
+
+```bash
+# user-level install (Codex canonical)
+# Codex reads SKILL.md (not SKILL.codex.md) at this path. The .codex.md
+# filename is a sibling artifact in the repo; the runtime file is
+# named SKILL.md per the §Where skills live table and the
+# register_codex_skill adapter's _CODEX_SKILL_REL_PATHS dict
+# (src/adapter/codex.py:58-62). The singular CODEX_SKILL_REL_PATH
+# at line 39 governs the 0-mvp register_codex only. The
+# §Where skills live table and the §Codex distribution prose
+# (README lines 38 and 85-86) are the source of truth for the
+# runtime filename; the dict name is implementation detail.
+mkdir -p "$HOME/.agents/skills/plugin-harness"
+mkdir -p "$HOME/.agents/skills/skill-creator"
+mkdir -p "$HOME/.agents/skills/plugin-creator"
+# cp -n skips overwriting by default (no-clobber, portable across
+# macOS + Linux, no TTY required). Symlink-source guard: refuse to
+# copy from a symlink (cp dereferences symlinks, which can silently
+# inject attacker content on a typosquatted fork). The check is on
+# the src only — a parent-walk would be stronger but requires more
+# shell; documenting the src-only scope is the minimum-viable
+# hardening.
+for s in plugin-harness skill-creator plugin-creator; do
+  src="skills/$s/SKILL.codex.md"
+  [ -L "$src" ] && { echo "refusing to copy from symlink: $src" >&2; continue; }
+  cp -n "$src" "$HOME/.agents/skills/$s/SKILL.md"
+done
+
+# repo-level install (project-scoped, what `/skill-creator` in Codex reads)
+for s in plugin-harness skill-creator plugin-creator; do
+  mkdir -p ".agents/skills/$s"
+  src="skills/$s/SKILL.codex.md"
+  [ -L "$src" ] && { echo "refusing to copy from symlink: $src" >&2; continue; }
+  cp -n "$src" ".agents/skills/$s/SKILL.md"
+done
+```
+
+Then restart Codex. The skills become invocable as `$plugin-harness`,
+`$skill-creator`, `$plugin-creator`.
+
+### Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `/help` doesn't list the skills after install | Reload not run | `claude plugin reload` |
+| `claude plugin install` errors with "manifest not found" | Marketplace catalog entry pointing at a stale SHA or the repo's `.claude-plugin/plugin.json` is missing/malformed | `gh api repos/sh-ai-x/plugin-harness/contents/.claude-plugin/plugin.json` to confirm the file is reachable; rerun `claude plugin marketplace add` if you changed the URL |
+| `claude --plugin-dir <path>` errors with "manifest not found" | Wrong target — `--plugin-dir` takes the **parent directory** containing `.claude-plugin/plugin.json`, not the file itself | Pass the directory above the `.claude-plugin/` dir, e.g. `claude --plugin-dir .` (if you ran the command from the plugin root) |
+| Skill assets installed but `dev-kit` substring in description triggers nothing | The `dev-kit` substring validator (`src/skill_schema/validator.py`) fires at **emit time** (when this project's `src/emitter/{skill,plugin_skill_bundle}.py` produces a SKILL.md), NOT at marketplace install. A skill that already contains `dev-kit` will be installed as-is; this project's own emitter refuses to generate one. | Edit the offending description and re-emit (or edit the file directly if you have a fork with the same issue) |
+| Marketplace not found at `claude plugin marketplace add` | GitHub URL unreachable, or the marketplace.json in the repo root is malformed | Visit the URL in a browser; confirm `.claude-plugin/marketplace.json` exists; rerun the `add` command |
+| `claude plugin update` says "no update available" | Marketplace ref not bumped yet (the version-bump workflow ran but didn't update) | Open a PR; the workflow runs on merge-to-main |
 
 ---
 
