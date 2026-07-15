@@ -154,6 +154,12 @@ happen from the Claude Code CLI.
 
 ### 1. Add the self-hosted marketplace (one-time, per machine)
 
+Before running the `add` command: open
+<https://github.com/sh-ai-x/plugin-harness> in a browser and confirm the
+URL is the official plugin-harness repo. Self-hosted marketplace entries
+land the user's machine in whatever repo the URL points to by design —
+a typo'd URL could land you in an arbitrary repo. Verify first.
+
 ```bash
 claude plugin marketplace add https://github.com/sh-ai-x/plugin-harness
 ```
@@ -292,15 +298,24 @@ into `~/.claude/skills/<name>/` by hand:
 mkdir -p ~/.claude/skills/plugin-harness
 mkdir -p ~/.claude/skills/skill-creator
 mkdir -p ~/.claude/skills/plugin-creator
-cp skills/plugin-harness/SKILL.md  ~/.claude/skills/plugin-harness/
-cp skills/skill-creator/SKILL.md   ~/.claude/skills/skill-creator/
-cp skills/plugin-creator/SKILL.md  ~/.claude/skills/plugin-creator/
+# cp -i prompts before overwriting; use 'n' to keep any pre-existing
+# custom skill by the same name. Plain 'cp' silently clobbers.
+cp -i skills/plugin-harness/SKILL.md  ~/.claude/skills/plugin-harness/
+cp -i skills/skill-creator/SKILL.md   ~/.claude/skills/skill-creator/
+cp -i skills/plugin-creator/SKILL.md  ~/.claude/skills/plugin-creator/
 ```
 
 Then `/reload-plugins` in Claude Code. The skills appear as
 `/plugin-harness`, `/skill-creator`, `/plugin-creator` (unprefixed in
 this mode). Note: this is the install path BEFORE the marketplace was
 shipped; the marketplace install supersedes it.
+
+**`/plugin-harness:new` is NOT available in the manual install path.**
+That slash command requires the plugin's `commands/new.md` asset, which
+ships only in the plugin root directory (consumed by the marketplace
+install via `claude --plugin-dir` or `/plugin install`). The manual
+`cp` path gives you the three SKILL.md assets only; if you need the
+`/new` slash command, use the marketplace or dev-mode install.
 
 ### Codex-side install
 
@@ -315,14 +330,15 @@ Codex's user-level canonical path is `$HOME/.agents/skills/<name>/` (NOT
 mkdir -p "$HOME/.agents/skills/plugin-harness"
 mkdir -p "$HOME/.agents/skills/skill-creator"
 mkdir -p "$HOME/.agents/skills/plugin-creator"
+# cp -i prompts before overwriting; plain cp silently clobbers.
 for s in plugin-harness skill-creator plugin-creator; do
-  cp "skills/$s/SKILL.codex.md" "$HOME/.agents/skills/$s/"
+  cp -i "skills/$s/SKILL.codex.md" "$HOME/.agents/skills/$s/"
 done
 
 # repo-level install (project-scoped, what `/skill-creator` in Codex reads)
 for s in plugin-harness skill-creator plugin-creator; do
   mkdir -p ".agents/skills/$s"
-  cp "skills/$s/SKILL.codex.md" ".agents/skills/$s/"
+  cp -i "skills/$s/SKILL.codex.md" ".agents/skills/$s/"
 done
 ```
 
