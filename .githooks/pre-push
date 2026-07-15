@@ -37,8 +37,22 @@ version_of() {
     git show "$1:$PLUGIN_JSON" 2>/dev/null | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])" 2>/dev/null
 }
 
+# Strict semver validator: digits.dots only. Used to guard every value
+# that's about to be interpolated into a `python3 -c` shell string.
+# Even though `git show` is invoked on a known-good ref, a poisoned
+# ref (e.g. via environment manipulation) or a maliciously-rewritten
+# plugin.json would otherwise give an attacker control of the shell
+# template. Defense-in-depth: validate at every sink.
+is_semver() {
+    echo "$1" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'
+}
+
 semver_gt() {
     # $1 > $2 ? exit 0 : exit 1  (simple MAJOR.MINOR.PATCH integer compare)
+    if ! is_semver "$1" || ! is_semver "$2"; then
+        echo "[pre-push] BLOCKED: malformed semver (got '$1' vs '$2')." >&2
+        exit 1
+    fi
     python3 -c "
 import sys
 a = tuple(int(x) for x in '$1'.split('.'))
@@ -49,6 +63,10 @@ sys.exit(0 if a > b else 1)
 
 bump_patch() {
     # $1 = current version string "X.Y.Z" -> prints "X.Y.(Z+1)"
+    if ! is_semver "$1"; then
+        echo "[pre-push] BLOCKED: cannot bump non-semver '$1'." >&2
+        exit 1
+    fi
     python3 -c "
 major, minor, patch = '$1'.split('.')
 print(f'{major}.{minor}.{int(patch)+1}')
@@ -101,6 +119,14 @@ while read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA; do
 
             if [ "$LOCAL_VERSION" = "$MAIN_VERSION" ]; then
                 NEW_VERSION="$(bump_patch "$MAIN_VERSION")"
+                # Defense-in-depth (also guarded by bump_patch above): the
+                # NEW version string still goes into a shell-interpolated
+                # python3 -c below. Re-validate so a future refactor of
+                # bump_patch can't regress this sink.
+                if ! is_semver "$NEW_VERSION"; then
+                    echo "[pre-push] BLOCKED: NEW_VERSION '$NEW_VERSION' failed semver guard." >&2
+                    exit 1
+                fi
                 echo "[pre-push] auto-bumping version: $MAIN_VERSION -> $NEW_VERSION" >&2
 
                 python3 -c "
@@ -118,11 +144,31 @@ for p in ['$PLUGIN_JSON', '$CODEX_PLUGIN_JSON']:
                 git add "$PLUGIN_JSON"
                 [ -f "$CODEX_PLUGIN_JSON" ] && git add "$CODEX_PLUGIN_JSON"
                 git commit --no-verify -m "chore(release): bump plugin-harness to v${NEW_VERSION}"
-                # Re-read LOCAL_SHA after the bump commit so downstream tooling
-                # (if any inspects the pushed ref) sees the correct tip. The
-                # push itself uses whatever ref git push already resolved;
-                # since we amended history right before push, git's push
-                # machinery picks up the new HEAD automatically.
+                # Find the bumped ref. We need a ref that uniquely
+                # identifies the bumped commit for the in-flight push.
+                # Use the local branch name (LOCAL_REF like
+                # refs/heads/feat/foo) so we can pass it explicitly to
+                # `git push <remote> <refspec>` — that pushes the
+                # current tip of LOCAL_REF (which now includes the
+                # bump commit). Reading the env var matches what Git
+                # passes to the hook. Falls back to `HEAD` (which Git
+                # also uses for the push) if LOCAL_REF is unset.
+                if [ -n "$LOCAL_REF" ]; then
+                    PUSH_BRANCH="${LOCAL_REF#refs/heads/}"
+                else
+                    PUSH_BRANCH="HEAD"
+                fi
+                # Per-pre-push-hook semantics, Git runs the hook BEFORE
+                # accepting the push, so the local commits (including
+                # the just-created bump) are present on the local
+                # tracking ref. The push itself happens after the hook
+                # returns 0. This block intentionally does not invoke
+                # `git push` itself — we don't push from inside the hook
+                # (avoids nested-lock + double-hook), we just amend the
+                # local ref so the user's subsequent `git push` picks
+                # up the bump automatically. If a downstream tool
+                # (e.g. gh workflow) was going to push from CI rather
+                # than the user, this hook wouldn't have fired.
             elif semver_gt "$MAIN_VERSION" "$LOCAL_VERSION"; then
                 echo "[pre-push] BLOCKED: local version ($LOCAL_VERSION) is behind main ($MAIN_VERSION)." >&2
                 echo "  Rebase onto origin/main first: git fetch origin main && git rebase origin/main" >&2
