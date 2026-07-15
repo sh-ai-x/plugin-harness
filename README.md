@@ -137,39 +137,131 @@ interview entirely and produce the same artifacts programmatically.
 
 ## Install
 
-### Recommended — via marketplace (Claude Code)
+The repo is a Claude Code plugin published through a **self-hosted
+marketplace**. The plugin manifest lives at
+[`.claude-plugin/plugin.json`](.claude-plugin/plugin.json); the
+marketplace catalog entry is at
+[`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json);
+and a parallel Codex-side manifest is at
+[`.codex-plugin/plugin.json`](.codex-plugin/plugin.json). The three
+SKILL.md assets ship at repo-root
+[`skills/<name>/SKILL.md`](skills/) (Claude layout) and
+`skills/<name>/SKILL.codex.md` (Codex layout companion).
 
-The repo ships as a Claude Code plugin under
-[`.claude-plugin/plugin.json`](.claude-plugin/plugin.json) with a
-[self-hosted marketplace entry](.claude-plugin/marketplace.json). To
-install plugin-harness in your Claude Code:
+The full install has **two parts**: (1) the user adds the marketplace
+once; (2) the user installs the plugin from the marketplace. Both
+happen from the Claude Code CLI.
+
+### 1. Add the self-hosted marketplace (one-time, per machine)
 
 ```bash
-# one-time — add the marketplace
 claude plugin marketplace add https://github.com/sh-ai-x/plugin-harness
+```
 
-# install the plugin
+Verify it registered:
+
+```bash
+claude plugin marketplace list
+# expect a line containing: sh-ai-x-plugins  https://github.com/sh-ai-x/plugin-harness
+```
+
+To remove the marketplace later (without uninstalling the plugin
+itself — the plugin is already on disk and survives marketplace removal):
+
+```bash
+claude plugin marketplace remove sh-ai-x-plugins
+```
+
+### 2. Install the plugin
+
+```bash
 claude plugin install plugin-harness
 ```
 
-After install, three skills become available as **namespaced slash
-commands**:
+The CLI clones the repo (or pulls a vendored copy) and registers
+`plugin-harness` with Claude Code. After install, three skills become
+available as **namespaced slash commands**:
 
-- `/plugin-harness:plugin-harness` (or `/plugin-harness` if you installed
-  via skills-directory mode) — the 5-question plugin interview
-- `/plugin-harness:skill-creator` — 3-question skill interview
-- `/plugin-harness:plugin-creator` — plugin + skill bundle
+| Slash command | What it does |
+|---|---|
+| `/plugin-harness:plugin-harness` | 5-question plugin interview → Codex-layout plugin |
+| `/plugin-harness:skill-creator` | 3-question skill interview → dual-runtime SKILL.md pair |
+| `/plugin-harness:plugin-creator` | 5-question plugin + dual-runtime skill bundle |
 
-Run `/reload-plugins` after install. To update: `claude plugin update
-plugin-harness`.
+Namespacing follows the Claude plugin convention: `<plugin-name>:<skill-name>`
+to avoid collisions across plugins.
 
-Dev-mode install (without marketplace) for plugin-harness contributors:
+### 3. Verify the install
 
 ```bash
-claude --plugin-dir /path/to/plugin-harness/.claude-plugin
+# Reload the plugin registry (always do this after install/update)
+claude plugin reload
+
+# Confirm the plugin is loaded
+claude plugin list
+# expect a line containing: plugin-harness  <version>  ...
+
+# Confirm the three skills are visible
+/help
+# search for: /plugin-harness:plugin-harness  /plugin-harness:skill-creator  /plugin-harness:plugin-creator
 ```
 
-### Fallback — pip install (library path only)
+### 4. Update an existing install
+
+When the maintainer bumps the version (the
+[version-bump workflow](.github/workflows/version-bump.yml) does this
+on every merge to main), refresh your local install:
+
+```bash
+claude plugin update plugin-harness
+claude plugin reload
+```
+
+If `update` errors (rare; usually a permissions issue on the cache
+directory), uninstall + reinstall:
+
+```bash
+claude plugin uninstall plugin-harness
+claude plugin install plugin-harness
+```
+
+### 5. Uninstall
+
+```bash
+claude plugin uninstall plugin-harness
+```
+
+The plugin's runtime artifacts (`.claude/skills/plugin-harness:*/SKILL.md`,
+`.claude/commands/...`) are removed. The marketplace registration
+persists (a separate removal if you want it gone too — see step 1).
+
+### Dev-mode install (plugin-harness contributors)
+
+If you're editing the plugin-harness source itself, point Claude
+Code at the local checkout instead of the marketplace entry — this
+lets you test changes before cutting a release:
+
+```bash
+# from inside the plugin-harness repo
+claude --plugin-dir .claude-plugin
+```
+
+The `--plugin-dir` flag (per
+[code.claude.com/docs/en/plugins](https://code.claude.com/docs/en/plugins))
+points Claude Code at a local plugin directory. It accepts either the
+`.claude-plugin/plugin.json` directly or the parent directory. Use
+`/reload-plugins` after each code change.
+
+When your changes are ready, the workflow is:
+1. Run `bash scripts/ci-local.sh` (verifies tests + JSON manifests).
+2. Commit + push to main.
+3. The CI version-bump workflow patches the version + commit-pins the
+   marketplace ref. (The PR #42 follow-up will run that workflow as
+   soon as PR #42 merges; for now, bump manually if needed.)
+4. Users run `claude plugin update plugin-harness` to pull the new
+   version.
+
+### Fallback — `pip install` for the library path only
 
 ```bash
 python -m pip install -e .
@@ -181,9 +273,66 @@ Requires Python ≥ 3.10. Runtime deps (pinned in `pyproject.toml`):
 `pip install` does **not** install Claude or Codex skills by itself; it
 only gives you the library API + CLI. To get the bundled skills into a
 runtime skill directory, use the marketplace install above, or call
-`register_cc_skill` / `register_codex_skill` programmatically
-(see "Library API" below). The library install path is for users who
-want to integrate plugin-harness into their own Python tools.
+`register_cc_skill` / `register_codex_skill` programmatically (see
+"Library API" below). The library install path is for users who want
+to integrate plugin-harness into their own Python tools, not for
+everyday skill authoring.
+
+### Fallback — manual install (no marketplace, no pip)
+
+For users who can't or don't want to use `claude plugin marketplace add`
+yet (offline, CI restrictions, etc.), drop the three SKILL.md files
+into `~/.claude/skills/<name>/` by hand:
+
+```bash
+# from the plugin-harness repo root
+mkdir -p ~/.claude/skills/plugin-harness
+mkdir -p ~/.claude/skills/skill-creator
+mkdir -p ~/.claude/skills/plugin-creator
+cp skills/plugin-harness/SKILL.md  ~/.claude/skills/plugin-harness/
+cp skills/skill-creator/SKILL.md   ~/.claude/skills/skill-creator/
+cp skills/plugin-creator/SKILL.md  ~/.claude/skills/plugin-creator/
+```
+
+Then `/reload-plugins` in Claude Code. The skills appear as
+`/plugin-harness`, `/skill-creator`, `/plugin-creator` (unprefixed in
+this mode). Note: this is the install path BEFORE the marketplace was
+shipped; the marketplace install supersedes it.
+
+### Codex-side install
+
+Codex reads the same SKILL.md files (the `.codex.md` companions) from
+a parallel location. Per
+[learn.chatgpt.com/docs/build-skills](https://learn.chatgpt.com/docs/build-skills):
+
+```bash
+# user-level install
+mkdir -p ~/.codex/skills/plugin-harness
+mkdir -p ~/.codex/skills/skill-creator
+mkdir -p ~/.codex/skills/plugin-creator
+for s in plugin-harness skill-creator plugin-creator; do
+  cp skills/$s/SKILL.codex.md ~/.codex/skills/$s/
+done
+
+# repo-level install (project-scoped)
+for s in plugin-harness skill-creator plugin-creator; do
+  mkdir -p .codex/skills/$s
+  cp skills/$s/SKILL.codex.md .codex/skills/$s/
+done
+```
+
+Then restart Codex. The skills become invocable as `$plugin-harness`,
+`$skill-creator`, `$plugin-creator`.
+
+### Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `/help` doesn't list the skills after install | Reload not run | `claude plugin reload` |
+| `claude plugin install` errors with "manifest not found" | Wrong `--plugin-dir` target | Pass the directory containing `.claude-plugin/plugin.json`, not the file itself |
+| Skill assets installed but no dev-kit check finds them | `dev-kit` substring in description (validator blocks) | Edit the description to remove the substring; the validator enforces this at install time |
+| Marketplace not found at `claude plugin marketplace add` | GitHub URL unreachable, or the marketplace.json in the repo root is malformed | Visit the URL in a browser; confirm `.claude-plugin/marketplace.json` exists; rerun the `add` command |
+| `claude plugin update` says "no update available" | Marketplace ref not bumped yet (the version-bump workflow ran but didn't update) | Open a PR; the workflow runs on merge-to-main |
 
 ---
 
