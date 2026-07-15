@@ -187,6 +187,7 @@ available as **namespaced slash commands**:
 | `/plugin-harness:plugin-harness` | 5-question plugin interview → Codex-layout plugin |
 | `/plugin-harness:skill-creator` | 3-question skill interview → dual-runtime SKILL.md pair |
 | `/plugin-harness:plugin-creator` | 5-question plugin + dual-runtime skill bundle |
+| `/plugin-harness:new` | Primary CLI entry point: runs the interview engine with the flags you pass (`--mode user` / `--mode=skill_create` / `--mode=ai-research` / `--skill-slug <slug>` / `--output-dir <dir>`) |
 
 Namespacing follows the Claude plugin convention: `<plugin-name>:<skill-name>`
 to avoid collisions across plugins.
@@ -248,16 +249,18 @@ claude --plugin-dir .claude-plugin
 
 The `--plugin-dir` flag (per
 [code.claude.com/docs/en/plugins](https://code.claude.com/docs/en/plugins))
-points Claude Code at a local plugin directory. It accepts either the
-`.claude-plugin/plugin.json` directly or the parent directory. Use
-`/reload-plugins` after each code change.
+points Claude Code at a local plugin directory. It takes the **parent
+directory** that contains `.claude-plugin/plugin.json` (i.e. the plugin
+root), not the manifest file itself. Use `/reload-plugins` after each
+code change.
 
 When your changes are ready, the workflow is:
 1. Run `bash scripts/ci-local.sh` (verifies tests + JSON manifests).
 2. Commit + push to main.
-3. The CI version-bump workflow patches the version + commit-pins the
-   marketplace ref. (The PR #42 follow-up will run that workflow as
-   soon as PR #42 merges; for now, bump manually if needed.)
+3. The CI version-bump workflow
+   ([`.github/workflows/version-bump.yml`](.github/workflows/version-bump.yml))
+   patches the version + commit-pins the marketplace ref on every merge to
+   main. Users pick up the new version via `claude plugin update`.
 4. Users run `claude plugin update plugin-harness` to pull the new
    version.
 
@@ -303,21 +306,23 @@ shipped; the marketplace install supersedes it.
 
 Codex reads the same SKILL.md files (the `.codex.md` companions) from
 a parallel location. Per
-[learn.chatgpt.com/docs/build-skills](https://learn.chatgpt.com/docs/build-skills):
+[learn.chatgpt.com/docs/build-skills](https://learn.chatgpt.com/docs/build-skills),
+Codex's user-level canonical path is `$HOME/.agents/skills/<name>/` (NOT
+`~/.codex/skills/`, which was an earlier convention):
 
 ```bash
-# user-level install
-mkdir -p ~/.codex/skills/plugin-harness
-mkdir -p ~/.codex/skills/skill-creator
-mkdir -p ~/.codex/skills/plugin-creator
+# user-level install (Codex canonical)
+mkdir -p "$HOME/.agents/skills/plugin-harness"
+mkdir -p "$HOME/.agents/skills/skill-creator"
+mkdir -p "$HOME/.agents/skills/plugin-creator"
 for s in plugin-harness skill-creator plugin-creator; do
-  cp skills/$s/SKILL.codex.md ~/.codex/skills/$s/
+  cp "skills/$s/SKILL.codex.md" "$HOME/.agents/skills/$s/"
 done
 
-# repo-level install (project-scoped)
+# repo-level install (project-scoped, what `/skill-creator` in Codex reads)
 for s in plugin-harness skill-creator plugin-creator; do
-  mkdir -p .codex/skills/$s
-  cp skills/$s/SKILL.codex.md .codex/skills/$s/
+  mkdir -p ".agents/skills/$s"
+  cp "skills/$s/SKILL.codex.md" ".agents/skills/$s/"
 done
 ```
 
@@ -329,8 +334,9 @@ Then restart Codex. The skills become invocable as `$plugin-harness`,
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | `/help` doesn't list the skills after install | Reload not run | `claude plugin reload` |
-| `claude plugin install` errors with "manifest not found" | Wrong `--plugin-dir` target | Pass the directory containing `.claude-plugin/plugin.json`, not the file itself |
-| Skill assets installed but no dev-kit check finds them | `dev-kit` substring in description (validator blocks) | Edit the description to remove the substring; the validator enforces this at install time |
+| `claude plugin install` errors with "manifest not found" | Marketplace catalog entry pointing at a stale SHA or the repo's `.claude-plugin/plugin.json` is missing/malformed | `gh api repos/sh-ai-x/plugin-harness/contents/.claude-plugin/plugin.json` to confirm the file is reachable; rerun `claude plugin marketplace add` if you changed the URL |
+| `claude --plugin-dir <path>` errors with "manifest not found" | Wrong target — `--plugin-dir` takes the **parent directory** containing `.claude-plugin/plugin.json`, not the file itself | Pass the directory above the `.claude-plugin/` dir, e.g. `claude --plugin-dir .` (if you ran the command from the plugin root) |
+| Skill assets installed but `dev-kit` substring in description triggers nothing | The `dev-kit` substring validator (`src/skill_schema/validator.py`) fires at **emit time** (when this project's `src/emitter/{skill,plugin_skill_bundle}.py` produces a SKILL.md), NOT at marketplace install. A skill that already contains `dev-kit` will be installed as-is; this project's own emitter refuses to generate one. | Edit the offending description and re-emit (or edit the file directly if you have a fork with the same issue) |
 | Marketplace not found at `claude plugin marketplace add` | GitHub URL unreachable, or the marketplace.json in the repo root is malformed | Visit the URL in a browser; confirm `.claude-plugin/marketplace.json` exists; rerun the `add` command |
 | `claude plugin update` says "no update available" | Marketplace ref not bumped yet (the version-bump workflow ran but didn't update) | Open a PR; the workflow runs on merge-to-main |
 
