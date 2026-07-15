@@ -161,7 +161,20 @@ land the user's machine in whatever repo the URL points to by design —
 a typo'd URL could land you in an arbitrary repo. Verify first.
 
 ```bash
+# Default (mutable ref): the marketplace catalog's plugins[].source.ref
+# is 'main', so the install resolves to whatever main points at right
+# now. Recommended for users who just want the latest.
 claude plugin marketplace add https://github.com/sh-ai-x/plugin-harness
+
+# Pinned (deterministic): if you want a specific commit SHA (reproducible
+# install, supply-chain defense), clone the marketplace locally and add
+# the local path with --ref pinned to the SHA. The self-hosted
+# marketplace form accepts source.ref = "<git-sha>".
+#   git clone https://github.com/sh-ai-x/plugin-harness /tmp/ph-<sha>
+#   cd /tmp/ph-<sha> && git checkout <commit-sha>
+#   claude plugin marketplace add /tmp/ph-<sha>
+# This bypasses the mutable-`main` ref risk but trades it for a
+# stale-SHA risk — bump the SHA manually on each update.
 ```
 
 Verify it registered:
@@ -194,7 +207,8 @@ claude plugin install plugin-harness
 > like `main` resolve to whatever the branch currently points at, so a
 > compromise of `main` would be served to every user on their next
 > update. The project has a follow-up plan to default `source.ref` to
-> a pinned SHA + signed-tag workflow; for now, check the commit SHA at
+> a pinned SHA + signed-tag workflow. For the now-current workflow,
+> see the pinned-install variant in step 1 below, and verify the SHA at
 > <https://github.com/sh-ai-x/plugin-harness/commits/main> before
 > `claude plugin install`.
 
@@ -222,9 +236,10 @@ claude plugin reload
 claude plugin list
 # expect a line containing: plugin-harness  <version>  ...
 
-# Confirm the three skills are visible
+# Confirm all 4 slash commands are visible
 /help
-# search for: /plugin-harness:plugin-harness  /plugin-harness:skill-creator  /plugin-harness:plugin-creator
+# search for: /plugin-harness:plugin-harness  /plugin-harness:skill-creator
+#            /plugin-harness:plugin-creator  /plugin-harness:new
 ```
 
 ### 4. Update an existing install
@@ -352,7 +367,10 @@ Codex's user-level canonical path is `$HOME/.agents/skills/<name>/` (NOT
 # named SKILL.md per the §Where skills live table and the
 # register_codex_skill adapter's _CODEX_SKILL_REL_PATHS dict
 # (src/adapter/codex.py:58-62). The singular CODEX_SKILL_REL_PATH
-# at line 39 governs the 0-mvp register_codex only.
+# at line 39 governs the 0-mvp register_codex only. The
+# §Where skills live table and the §Codex distribution prose
+# (README lines 38 and 85-86) are the source of truth for the
+# runtime filename; the dict name is implementation detail.
 mkdir -p "$HOME/.agents/skills/plugin-harness"
 mkdir -p "$HOME/.agents/skills/skill-creator"
 mkdir -p "$HOME/.agents/skills/plugin-creator"
