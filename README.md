@@ -318,11 +318,11 @@ into `~/.claude/skills/<name>/` by hand:
 mkdir -p ~/.claude/skills/plugin-harness
 mkdir -p ~/.claude/skills/skill-creator
 mkdir -p ~/.claude/skills/plugin-creator
-# cp -i prompts before overwriting; use 'n' to keep any pre-existing
+# cp -n prompts before overwriting; use 'n' to keep any pre-existing
 # custom skill by the same name. Plain 'cp' silently clobbers.
-cp -i skills/plugin-harness/SKILL.md  ~/.claude/skills/plugin-harness/
-cp -i skills/skill-creator/SKILL.md   ~/.claude/skills/skill-creator/
-cp -i skills/plugin-creator/SKILL.md  ~/.claude/skills/plugin-creator/
+cp -n skills/plugin-harness/SKILL.md  ~/.claude/skills/plugin-harness/
+cp -n skills/skill-creator/SKILL.md   ~/.claude/skills/skill-creator/
+cp -n skills/plugin-creator/SKILL.md  ~/.claude/skills/plugin-creator/
 ```
 
 Then `/reload-plugins` in Claude Code. The skills appear as
@@ -354,14 +354,14 @@ Codex's user-level canonical path is `$HOME/.agents/skills/<name>/` (NOT
 mkdir -p "$HOME/.agents/skills/plugin-harness"
 mkdir -p "$HOME/.agents/skills/skill-creator"
 mkdir -p "$HOME/.agents/skills/plugin-creator"
-# cp -i prompts before overwriting; plain cp silently clobbers.
+# cp -n prompts before overwriting; plain cp silently clobbers.
 # Symlink source check: refuse to copy from a path where the parent is
 # a symlink (cp dereferences symlinks, which can silently inject
 # attacker content on a typosquatted fork).
 for s in plugin-harness skill-creator plugin-creator; do
   src="skills/$s/SKILL.codex.md"
   [ -L "$src" ] && { echo "refusing to copy from symlink: $src" >&2; continue; }
-  cp -i "$src" "$HOME/.agents/skills/$s/SKILL.md"
+  cp -n "$src" "$HOME/.agents/skills/$s/SKILL.md"
 done
 
 # repo-level install (project-scoped, what `/skill-creator` in Codex reads)
@@ -369,7 +369,7 @@ for s in plugin-harness skill-creator plugin-creator; do
   mkdir -p ".agents/skills/$s"
   src="skills/$s/SKILL.codex.md"
   [ -L "$src" ] && { echo "refusing to copy from symlink: $src" >&2; continue; }
-  cp -i "$src" ".agents/skills/$s/SKILL.md"
+  cp -n "$src" ".agents/skills/$s/SKILL.md"
 done
 ```
 
