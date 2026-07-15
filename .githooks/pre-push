@@ -94,17 +94,30 @@ while read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA; do
             echo "    git push --no-verify" >&2
             exit 1
             ;;
+        refs/tags/*)
+            # Tag push (no auto-bump — the version-bump workflow emits
+            # tags from main after merge). If a contributor pushes a
+            # tag manually before merge, do NOT auto-bump (a tag push
+            # should not change version pins in plugin.json).
+            ;;
+        refs/heads/*/delete)
+            # Branch deletion — no version work to do.
+            ;;
         *)
             # Feature branch: consider an auto-bump if plugin.json exists
-            # both locally and on origin/main (skip silently otherwise —
-            # e.g. very first commit before the manifest exists).
+            # both locally and on origin/main (WARN on skip rather than
+            # silent — a shallow clone or missed fetch can mask a stale-
+            # version merge, which the secret-scan + tag-pinning guards
+            # downstream depend on).
             if [ ! -f "$PLUGIN_JSON" ]; then
+                echo "[pre-push] INFO: $PLUGIN_JSON not found on the local branch; skipping version-bump (very first commit before the manifest exists)." >&2
                 continue
             fi
             if ! git rev-parse --verify -q origin/main >/dev/null; then
                 # No local knowledge of origin/main yet (e.g. shallow clone
-                # or first fetch not done). Skip the bump rather than fail
-                # the push over a comparison we cannot make safely.
+                # or first fetch not done). WARN, do not block — the push
+                # should not fail purely because origin/main isn't visible.
+                echo "[pre-push] WARN: cannot resolve origin/main (run 'git fetch origin main' first). Skipping version-bump; you may be pushing a stale version." >&2
                 continue
             fi
 
@@ -113,7 +126,9 @@ while read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA; do
 
             if [ -z "$LOCAL_VERSION" ] || [ -z "$MAIN_VERSION" ]; then
                 # Could not read one of the two versions (e.g. main predates
-                # this manifest). Skip the bump; do not block the push.
+                # this manifest). WARN, do not block — the version-bump
+                # workflow + tag pipeline still works on its own.
+                echo "[pre-push] WARN: could not read versions from HEAD/origin/main (manifest missing on one side?). Skipping version-bump." >&2
                 continue
             fi
 
@@ -143,32 +158,19 @@ for p in ['$PLUGIN_JSON', '$CODEX_PLUGIN_JSON']:
 "
                 git add "$PLUGIN_JSON"
                 [ -f "$CODEX_PLUGIN_JSON" ] && git add "$CODEX_PLUGIN_JSON"
-                git commit --no-verify -m "chore(release): bump plugin-harness to v${NEW_VERSION}"
-                # Find the bumped ref. We need a ref that uniquely
-                # identifies the bumped commit for the in-flight push.
-                # Use the local branch name (LOCAL_REF like
-                # refs/heads/feat/foo) so we can pass it explicitly to
-                # `git push <remote> <refspec>` — that pushes the
-                # current tip of LOCAL_REF (which now includes the
-                # bump commit). Reading the env var matches what Git
-                # passes to the hook. Falls back to `HEAD` (which Git
-                # also uses for the push) if LOCAL_REF is unset.
-                if [ -n "$LOCAL_REF" ]; then
-                    PUSH_BRANCH="${LOCAL_REF#refs/heads/}"
-                else
-                    PUSH_BRANCH="HEAD"
-                fi
+                # Stage-only here. The contributor's own pre-commit
+                # hook chain (incl. secret-scan) will run on the resulting
+                # commit. --no-verify would skip secret-scan and any
+                # future pre-commit hook — explicitly avoid that, since
+                # the bump commit IS still user-authored code.
+                git commit -m "chore(release): bump plugin-harness to v${NEW_VERSION}"
                 # Per-pre-push-hook semantics, Git runs the hook BEFORE
                 # accepting the push, so the local commits (including
                 # the just-created bump) are present on the local
                 # tracking ref. The push itself happens after the hook
-                # returns 0. This block intentionally does not invoke
-                # `git push` itself — we don't push from inside the hook
-                # (avoids nested-lock + double-hook), we just amend the
-                # local ref so the user's subsequent `git push` picks
-                # up the bump automatically. If a downstream tool
-                # (e.g. gh workflow) was going to push from CI rather
-                # than the user, this hook wouldn't have fired.
+                # returns 0 — Git then pushes the bumped commit to the
+                # remote. We do NOT invoke `git push` from inside the
+                # hook (avoids nested-lock + double-hook).
             elif semver_gt "$MAIN_VERSION" "$LOCAL_VERSION"; then
                 echo "[pre-push] BLOCKED: local version ($LOCAL_VERSION) is behind main ($MAIN_VERSION)." >&2
                 echo "  Rebase onto origin/main first: git fetch origin main && git rebase origin/main" >&2
