@@ -10,9 +10,8 @@ GitHub Actions log readability.
 
 Checks performed (each prints `OK (...)` or `FAIL (...):`):
 1. validate_installation_complete — all 8 required files present
-2. validate_marker              — `.dev-kit/ci-config.json` shape + version
-3. validate_bash_syntax         — `bash -n` on every installed .sh
-4. validate_test_runner         — `scripts/test.sh` is bash-clean
+2. validate_marker              — `.dev-kit/ci-config.json` shape
+3. validate_bash_syntax         — `bash -n` on every installed .sh + pre-push
 """
 from __future__ import annotations
 
