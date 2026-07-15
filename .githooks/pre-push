@@ -1,12 +1,23 @@
 #!/usr/bin/env bash
-# .githooks/pre-push — Block direct push to main (enforce PR-only workflow).
+# .githooks/pre-push — Block direct push to main (enforce PR-only workflow)
+# + auto-bump the plugin version on feature-branch pushes.
 #
-# Why: this repo's policy requires PR review before merge to main.
-# Direct push to main bypasses review → automatic blocker.
+# Why (branch block): this repo's policy requires PR review before merge to
+# main. Direct push to main bypasses review → automatic blocker.
+#
+# Why (version bump here, not pre-commit): pre-commit fires on every commit
+# (incl. amend / rebase); bumping there would generate noise. Pre-push fires
+# once per push and can compare against origin/main, making it the right
+# trigger point for a release-gated decision. Mirrors dev-harness-kit's
+# .githooks/pre-push convention.
+#
+# Version-bump decision (feature branches only, never main):
+#   LOCAL version >  MAIN version → already bumped manually; skip.
+#   LOCAL version == MAIN version → auto-bump PATCH, commit, then push.
+#   LOCAL version <  MAIN version → refuse push; rebase onto main first.
 #
 # Activation:
 #   git config core.hooksPath .githooks       # local-only
-#   ./lib/install.sh --setup-hooks            # install.sh 자동 호출
 #
 # Bypass (for maintainers ONLY with explicit —no-verify, NEVER default):
 #   git push --no-verify
@@ -15,6 +26,34 @@
 # This hook is the client-side enforcement + CI will additionally gate.
 
 set -eo pipefail
+
+PLUGIN_JSON=".claude-plugin/plugin.json"
+CODEX_PLUGIN_JSON=".codex-plugin/plugin.json"
+
+version_of() {
+    # $1 = git ref (e.g. HEAD, origin/main). Reads plugin.json's version
+    # field at that ref via `git show`. Requires python3 (already a hard
+    # dependency of this project).
+    git show "$1:$PLUGIN_JSON" 2>/dev/null | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])" 2>/dev/null
+}
+
+semver_gt() {
+    # $1 > $2 ? exit 0 : exit 1  (simple MAJOR.MINOR.PATCH integer compare)
+    python3 -c "
+import sys
+a = tuple(int(x) for x in '$1'.split('.'))
+b = tuple(int(x) for x in '$2'.split('.'))
+sys.exit(0 if a > b else 1)
+"
+}
+
+bump_patch() {
+    # $1 = current version string "X.Y.Z" -> prints "X.Y.(Z+1)"
+    python3 -c "
+major, minor, patch = '$1'.split('.')
+print(f'{major}.{minor}.{int(patch)+1}')
+"
+}
 
 # Read push lines: <local_ref> <local_sha> <remote_ref> <remote_sha>
 while read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA; do
@@ -38,7 +77,58 @@ while read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA; do
             exit 1
             ;;
         *)
-            # Allow non-main branches
+            # Feature branch: consider an auto-bump if plugin.json exists
+            # both locally and on origin/main (skip silently otherwise —
+            # e.g. very first commit before the manifest exists).
+            if [ ! -f "$PLUGIN_JSON" ]; then
+                continue
+            fi
+            if ! git rev-parse --verify -q origin/main >/dev/null; then
+                # No local knowledge of origin/main yet (e.g. shallow clone
+                # or first fetch not done). Skip the bump rather than fail
+                # the push over a comparison we cannot make safely.
+                continue
+            fi
+
+            LOCAL_VERSION="$(version_of HEAD || true)"
+            MAIN_VERSION="$(version_of origin/main || true)"
+
+            if [ -z "$LOCAL_VERSION" ] || [ -z "$MAIN_VERSION" ]; then
+                # Could not read one of the two versions (e.g. main predates
+                # this manifest). Skip the bump; do not block the push.
+                continue
+            fi
+
+            if [ "$LOCAL_VERSION" = "$MAIN_VERSION" ]; then
+                NEW_VERSION="$(bump_patch "$MAIN_VERSION")"
+                echo "[pre-push] auto-bumping version: $MAIN_VERSION -> $NEW_VERSION" >&2
+
+                python3 -c "
+import json
+for p in ['$PLUGIN_JSON', '$CODEX_PLUGIN_JSON']:
+    try:
+        data = json.load(open(p))
+    except FileNotFoundError:
+        continue
+    data['version'] = '$NEW_VERSION'
+    with open(p, 'w') as f:
+        json.dump(data, f, indent=2)
+        f.write('\n')
+"
+                git add "$PLUGIN_JSON"
+                [ -f "$CODEX_PLUGIN_JSON" ] && git add "$CODEX_PLUGIN_JSON"
+                git commit --no-verify -m "chore(release): bump plugin-harness to v${NEW_VERSION}"
+                # Re-read LOCAL_SHA after the bump commit so downstream tooling
+                # (if any inspects the pushed ref) sees the correct tip. The
+                # push itself uses whatever ref git push already resolved;
+                # since we amended history right before push, git's push
+                # machinery picks up the new HEAD automatically.
+            elif semver_gt "$MAIN_VERSION" "$LOCAL_VERSION"; then
+                echo "[pre-push] BLOCKED: local version ($LOCAL_VERSION) is behind main ($MAIN_VERSION)." >&2
+                echo "  Rebase onto origin/main first: git fetch origin main && git rebase origin/main" >&2
+                exit 1
+            fi
+            # else: LOCAL_VERSION > MAIN_VERSION — already bumped manually, skip.
             ;;
     esac
 done

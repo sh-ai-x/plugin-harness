@@ -1,14 +1,18 @@
 name: version-bump
 
-# 1-skill-creator follow-up: per the official version-management docs
-# (https://code.claude.com/docs/en/plugins#version-management), the
-# `.claude-plugin/plugin.json` `version` field and the
-# `.claude-plugin/marketplace.json` `source.ref` field are version pins
-# for marketplace installs. Bumping them is a one-step release action;
-# CI does it on every merge to main so we never ship without a bump.
+# Tag-only emission. The actual version bump happens locally via
+# .githooks/pre-push before the PR is even opened — every PR merged to
+# main already carries its own bump in the commit history (see the
+# pre-push hook's LOCAL-vs-origin/main comparison). This workflow's only
+# job is: on push to main, read the (already-bumped) version from
+# .claude-plugin/plugin.json, validate it's semver, and if it's new
+# (not already tagged), create + push an annotated git tag for it.
 #
-# Policy: patch bump (x.y.N) on every merge to main. Manual major/minor
-# bumps happen via PR + merge after a maintainer cuts the version locally.
+# Mirrors dev-harness-kit's .github/workflows/version-bump.yml convention:
+# no pytest, no dependency install, pure stdlib (python3 + git) — so
+# there is no missing-dependency failure mode. (The prior version of
+# this workflow tried to bump-and-commit-back from CI and ran pytest
+# without installing it first, which failed on every merge to main.)
 
 on:
   push:
@@ -16,10 +20,9 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 jobs:
-  bump:
+  tag:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -27,72 +30,28 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-
-      - name: Bump version in plugin.json + codex-plugin/plugin.json + marketplace.json source.ref
+      - name: Read + validate version, emit tag if new
         run: |
           set -euo pipefail
 
-          # Read current version from .claude-plugin/plugin.json
-          CURRENT=$(python3 -c "import json; print(json.load(open('.claude-plugin/plugin.json'))['version'])")
-          echo "Current version: $CURRENT"
-
-          # Bump patch (x.y.N -> x.y.N+1)
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
-          NEW_PATCH=$((PATCH + 1))
-          NEW="${MAJOR}.${MINOR}.${NEW_PATCH}"
-          echo "New version: $NEW"
-
-          # Update .claude-plugin/plugin.json
-          python3 -c "
-          import json, sys
-          p = '.claude-plugin/plugin.json'
-          data = json.load(open(p))
-          data['version'] = '$NEW'
-          json.dump(data, open(p, 'w'), indent=2)
-          open(p, 'a').write('\n')
-          "
-
-          # Update .codex-plugin/plugin.json
-          python3 -c "
-          import json
-          p = '.codex-plugin/plugin.json'
-          data = json.load(open(p))
-          data['version'] = '$NEW'
-          json.dump(data, open(p, 'w'), indent=2)
-          open(p, 'a').write('\n')
-          "
-
-          # Update marketplace.json source.ref to the new commit SHA
-          COMMIT_SHA="${GITHUB_SHA}"
-          python3 -c "
-          import json
-          p = '.claude-plugin/marketplace.json'
-          data = json.load(open(p))
-          for entry in data['plugins']:
-              if entry.get('source', {}).get('source') == 'url':
-                  entry['source']['ref'] = '$COMMIT_SHA'
-          json.dump(data, open(p, 'w'), indent=2)
-          open(p, 'a').write('\n')
-          "
-
-          echo "Bumped to $NEW (commit $COMMIT_SHA)"
-
-      - name: Validate manifests
-        run: |
-          python3 -m pytest tests/test_marketplace_json.py -q
-
-      - name: Commit + push the bump
-        run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add .claude-plugin/plugin.json .codex-plugin/plugin.json .claude-plugin/marketplace.json
-          if git diff --cached --quiet; then
-            echo "Nothing to commit (version already current)."
+
+          VERSION=$(python3 -c "import json; print(json.load(open('.claude-plugin/plugin.json'))['version'])")
+          echo "plugin.json version: $VERSION"
+
+          # Validate MAJOR.MINOR.PATCH (integers only).
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::version '$VERSION' is not valid MAJOR.MINOR.PATCH semver"
+            exit 1
+          fi
+
+          TAG="v${VERSION}"
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            echo "Tag ${TAG} already exists — nothing to do."
             exit 0
           fi
-          git commit -m "chore(release): bump version to $(python3 -c 'import json; print(json.load(open(\".claude-plugin/plugin.json\"))[\"version\"])') and pin marketplace to $GITHUB_SHA"
-          git push
+
+          git tag -a "$TAG" -m "Release ${TAG}"
+          git push origin "$TAG"
+          echo "Pushed tag ${TAG}"
