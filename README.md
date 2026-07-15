@@ -184,6 +184,20 @@ claude plugin marketplace remove sh-ai-x-plugins
 claude plugin install plugin-harness
 ```
 
+> **Security:** Adding a marketplace trusts the marketplace catalog and
+> (after install) every plugin revision it resolves on `claude plugin
+> update`. `marketplace.json` ships with `source.ref: "main"` (a mutable
+> ref), so any merge to `main` is immediately served to users on the
+> next `update`. The version-bump workflow pins a SHA only on its own
+> future runs, not at user-install time. **Pin a marketplace SHA before
+> installing and verify it against a signed release tag** — branch refs
+> like `main` resolve to whatever the branch currently points at, so a
+> compromise of `main` would be served to every user on their next
+> update. The project has a follow-up plan to default `source.ref` to
+> a pinned SHA + signed-tag workflow; for now, check the commit SHA at
+> <https://github.com/sh-ai-x/plugin-harness/commits/main> before
+> `claude plugin install`.
+
 The CLI clones the repo (or pulls a vendored copy) and registers
 `plugin-harness` with Claude Code. After install, three skills become
 available as **namespaced slash commands**:
@@ -250,15 +264,21 @@ lets you test changes before cutting a release:
 
 ```bash
 # from inside the plugin-harness repo
-claude --plugin-dir .claude-plugin
+claude --plugin-dir .
 ```
+
+> **Security:** The `--plugin-dir` path is **auto-loaded by Claude Code at
+> session start** — including all `.claude-plugin/` directives (hooks,
+> MCP/LSP servers, monitors, `bin/`, agents, settings). Only run from a
+> verified checkout you trust. Inspect the `.claude-plugin/` tree
+> (especially `hooks/hooks.json` and `.mcp.json`) before running.
 
 The `--plugin-dir` flag (per
 [code.claude.com/docs/en/plugins](https://code.claude.com/docs/en/plugins))
-points Claude Code at a local plugin directory. It takes the **parent
-directory** that contains `.claude-plugin/plugin.json` (i.e. the plugin
-root), not the manifest file itself. Use `/reload-plugins` after each
-code change.
+points Claude Code at a local plugin directory. It takes the directory
+**above** `.claude-plugin/` (i.e. the plugin root), not `.claude-plugin/`
+itself nor the manifest file. Use `/reload-plugins` after each code
+change.
 
 When your changes are ready, the workflow is:
 1. Run `bash scripts/ci-local.sh` (verifies tests + JSON manifests).
@@ -327,18 +347,29 @@ Codex's user-level canonical path is `$HOME/.agents/skills/<name>/` (NOT
 
 ```bash
 # user-level install (Codex canonical)
+# Codex reads SKILL.md (not SKILL.codex.md) at this path. The .codex.md
+# filename is a sibling artifact in the repo; the runtime file is
+# named SKILL.md per the §Where skills live table and the
+# register_codex_skill adapter's CODEX_SKILL_REL_PATH.
 mkdir -p "$HOME/.agents/skills/plugin-harness"
 mkdir -p "$HOME/.agents/skills/skill-creator"
 mkdir -p "$HOME/.agents/skills/plugin-creator"
 # cp -i prompts before overwriting; plain cp silently clobbers.
+# Symlink source check: refuse to copy from a path where the parent is
+# a symlink (cp dereferences symlinks, which can silently inject
+# attacker content on a typosquatted fork).
 for s in plugin-harness skill-creator plugin-creator; do
-  cp -i "skills/$s/SKILL.codex.md" "$HOME/.agents/skills/$s/"
+  src="skills/$s/SKILL.codex.md"
+  [ -L "$src" ] && { echo "refusing to copy from symlink: $src" >&2; continue; }
+  cp -i "$src" "$HOME/.agents/skills/$s/SKILL.md"
 done
 
 # repo-level install (project-scoped, what `/skill-creator` in Codex reads)
 for s in plugin-harness skill-creator plugin-creator; do
   mkdir -p ".agents/skills/$s"
-  cp -i "skills/$s/SKILL.codex.md" ".agents/skills/$s/"
+  src="skills/$s/SKILL.codex.md"
+  [ -L "$src" ] && { echo "refusing to copy from symlink: $src" >&2; continue; }
+  cp -i "$src" ".agents/skills/$s/SKILL.md"
 done
 ```
 
