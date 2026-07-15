@@ -333,8 +333,13 @@ into `~/.claude/skills/<name>/` by hand:
 mkdir -p ~/.claude/skills/plugin-harness
 mkdir -p ~/.claude/skills/skill-creator
 mkdir -p ~/.claude/skills/plugin-creator
-# cp -n prompts before overwriting; use 'n' to keep any pre-existing
-# custom skill by the same name. Plain 'cp' silently clobbers.
+# SECURITY: cp -n preserves any pre-existing SKILL.md in the target
+# directory. If the prior file was installed from a typosquatted
+# marketplace or a fork, cp -n keeps that file. To verify a clean
+# install, remove the target directory first (rm -rf
+# ~/.claude/skills/<name>) or inspect the existing file (cat
+# ~/.claude/skills/<name>/SKILL.md) before running the loop. To
+# clobber explicitly, replace cp -n with plain cp in the loop.
 cp -n skills/plugin-harness/SKILL.md  ~/.claude/skills/plugin-harness/
 cp -n skills/skill-creator/SKILL.md   ~/.claude/skills/skill-creator/
 cp -n skills/plugin-creator/SKILL.md  ~/.claude/skills/plugin-creator/
