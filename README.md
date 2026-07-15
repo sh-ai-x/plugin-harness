@@ -199,16 +199,14 @@ claude plugin install plugin-harness
 
 > **Security:** Adding a marketplace trusts the marketplace catalog and
 > (after install) every plugin revision it resolves on `claude plugin
-> update`. `marketplace.json` ships with `source.ref: "main"` (a mutable
-> ref), so any merge to `main` is immediately served to users on the
-> next `update`. The version-bump workflow pins a SHA only on its own
-> future runs, not at user-install time. **Pin a marketplace SHA before
-> installing and verify it against a signed release tag** — branch refs
-> like `main` resolve to whatever the branch currently points at, so a
-> compromise of `main` would be served to every user on their next
-> update. The project has a follow-up plan to default `source.ref` to
-> a pinned SHA + signed-tag workflow. For the now-current workflow,
-> see the pinned-install variant in step 1 below, and verify the SHA at
+> update`. `marketplace.json` ships with `source.ref: "main"` (a static,
+> mutable ref — this is not auto-updated by any CI job; it stays "main"
+> by design), so any merge to `main` is immediately served to users on
+> the next `update`. **Pin a marketplace SHA before installing and
+> verify it against a signed release tag** — branch refs like `main`
+> resolve to whatever the branch currently points at, so a compromise
+> of `main` would be served to every user on their next update. See the
+> pinned-install variant in step 1 below, and verify the SHA at
 > <https://github.com/sh-ai-x/plugin-harness/commits/main> before
 > `claude plugin install`.
 
@@ -244,9 +242,14 @@ claude plugin list
 
 ### 4. Update an existing install
 
-When the maintainer bumps the version (the
-[version-bump workflow](.github/workflows/version-bump.yml) does this
-on every merge to main), refresh your local install:
+The plugin version is bumped locally by a contributor's
+[`.githooks/pre-push`](.githooks/pre-push) hook before each PR merges
+(so every merged commit already carries its bump); the
+[version-bump workflow](.github/workflows/version-bump.yml) then tags
+the new version on merge to main. Since the marketplace's `source.ref`
+stays "main" (see the Security callout in step 1), any new merge is
+already what `claude plugin update` resolves — no separate "wait for
+CI" step is needed. Refresh your local install any time:
 
 ```bash
 claude plugin update plugin-harness
@@ -297,11 +300,18 @@ change.
 
 When your changes are ready, the workflow is:
 1. Run `bash scripts/ci-local.sh` (verifies tests + JSON manifests).
-2. Commit + push to main.
-3. The CI version-bump workflow
-   ([`.github/workflows/version-bump.yml`](.github/workflows/version-bump.yml))
-   patches the version + commit-pins the marketplace ref on every merge to
-   main. Users pick up the new version via `claude plugin update`.
+2. Push your feature branch. The
+   [`.githooks/pre-push`](.githooks/pre-push) hook auto-bumps the
+   `version` field in `.claude-plugin/plugin.json` +
+   `.codex-plugin/plugin.json` (patch bump, one commit) if your local
+   version matches `origin/main`'s — no manual bump needed for a normal
+   patch release. For a minor/major bump, edit the version by hand
+   before pushing; the hook detects `LOCAL > MAIN` and skips its own
+   bump.
+3. Open the PR; once merged, the
+   [version-bump workflow](.github/workflows/version-bump.yml) reads
+   the already-bumped version from `plugin.json` and pushes a `v<version>`
+   git tag. (No file mutation happens in CI — the workflow only tags.)
 4. Users run `claude plugin update plugin-harness` to pull the new
    version.
 
@@ -413,7 +423,7 @@ Then restart Codex. The skills become invocable as `$plugin-harness`,
 | `claude --plugin-dir <path>` errors with "manifest not found" | Wrong target — `--plugin-dir` takes the **parent directory** containing `.claude-plugin/plugin.json`, not the file itself | Pass the directory above the `.claude-plugin/` dir, e.g. `claude --plugin-dir .` (if you ran the command from the plugin root) |
 | Skill assets installed but `dev-kit` substring in description triggers nothing | The `dev-kit` substring validator (`src/skill_schema/validator.py`) fires at **emit time** (when this project's `src/emitter/{skill,plugin_skill_bundle}.py` produces a SKILL.md), NOT at marketplace install. A skill that already contains `dev-kit` will be installed as-is; this project's own emitter refuses to generate one. | Edit the offending description and re-emit (or edit the file directly if you have a fork with the same issue) |
 | Marketplace not found at `claude plugin marketplace add` | GitHub URL unreachable, or the marketplace.json in the repo root is malformed | Visit the URL in a browser; confirm `.claude-plugin/marketplace.json` exists; rerun the `add` command |
-| `claude plugin update` says "no update available" | Marketplace ref not bumped yet (the version-bump workflow ran but didn't update) | Open a PR; the workflow runs on merge-to-main |
+| `claude plugin update` says "no update available" | `marketplace.json`'s `source.ref` is `"main"` (static, mutable) — the version-bump workflow does NOT rewrite this field; it only tags releases. `claude plugin update` should already resolve `main`'s current tip. | Confirm the marketplace was added with the mutable-ref form (not a pinned-SHA local clone, which never auto-updates); `claude plugin marketplace remove sh-ai-x-plugins && claude plugin marketplace add https://github.com/sh-ai-x/plugin-harness` to re-resolve |
 
 ---
 

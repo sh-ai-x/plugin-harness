@@ -47,6 +47,18 @@ name: PR Review
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+    # Skip the workflow when the PR ONLY touches workflow files under
+    # .github/workflows/. anthropics/claude-code-action@v1 refuses to run
+    # on a PR that modifies its own review pipeline (workflow-validation
+    # guard), and the resulting "LLM review skipped" placeholder
+    # provides no review value. Such PRs are reviewed by the fallback
+    # fallback in the same run (the workflow still runs; only the LLM
+    # step self-skips) AND by the maintainer's manual `gh pr review`
+    # on the gate before merge. If the PR changes files outside
+    # .github/workflows/ in addition to workflow files, the run fires
+    # normally and the LLM reviews the full diff.
+    paths-ignore:
+      - .github/workflows/**
   workflow_dispatch:
     inputs:
       review_provider:
