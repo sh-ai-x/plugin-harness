@@ -350,14 +350,19 @@ Codex's user-level canonical path is `$HOME/.agents/skills/<name>/` (NOT
 # Codex reads SKILL.md (not SKILL.codex.md) at this path. The .codex.md
 # filename is a sibling artifact in the repo; the runtime file is
 # named SKILL.md per the §Where skills live table and the
-# register_codex_skill adapter's CODEX_SKILL_REL_PATH.
+# register_codex_skill adapter's _CODEX_SKILL_REL_PATHS dict
+# (src/adapter/codex.py:58-62). The singular CODEX_SKILL_REL_PATH
+# at line 39 governs the 0-mvp register_codex only.
 mkdir -p "$HOME/.agents/skills/plugin-harness"
 mkdir -p "$HOME/.agents/skills/skill-creator"
 mkdir -p "$HOME/.agents/skills/plugin-creator"
-# cp -n prompts before overwriting; plain cp silently clobbers.
-# Symlink source check: refuse to copy from a path where the parent is
-# a symlink (cp dereferences symlinks, which can silently inject
-# attacker content on a typosquatted fork).
+# cp -n skips overwriting by default (no-clobber, portable across
+# macOS + Linux, no TTY required). Symlink-source guard: refuse to
+# copy from a symlink (cp dereferences symlinks, which can silently
+# inject attacker content on a typosquatted fork). The check is on
+# the src only — a parent-walk would be stronger but requires more
+# shell; documenting the src-only scope is the minimum-viable
+# hardening.
 for s in plugin-harness skill-creator plugin-creator; do
   src="skills/$s/SKILL.codex.md"
   [ -L "$src" ] && { echo "refusing to copy from symlink: $src" >&2; continue; }
