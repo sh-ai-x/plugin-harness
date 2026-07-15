@@ -1,0 +1,26 @@
+# CODEOWNERS — plugin-harness
+# Order matters: last matching pattern wins. Keep this file small and explicit.
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default: every file needs a code-owner review before merge.
+*                                                           @sh-ai-x
+
+# Workflow files are the highest-blast-radius surface (a hostile change
+# can disable the LLM review gate itself). Pin an explicit owner so a
+# future second maintainer can co-own code without co-owning CI.
+# NOTE: workflows do not auto-trigger the LLM review when modified
+# (anthropics/claude-code-action@v1 self-protection guard), so a human
+# CODEOWNER review is the ONLY review this surface gets.
+/.github/workflows/**                                       @sh-ai-x
+
+# CI install scripts and the worktree-rule hooks: --force refresh on
+# these dropped jinja2+jsonschema install steps in scripts/test.sh on
+# PR #46, breaking the `test` job on the runner. Treat as security-
+# sensitive.
+/scripts/**                                                @sh-ai-x
+/hooks/**                                                   @sh-ai-x
+/.githooks/**                                               @sh-ai-x
+
+# Branch-protection marker file: protect it so accidental deletion
+# can't silently downgrade safety.
+/.dev-kit/ci-config.json                                    @sh-ai-x
