@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "plugin-harness",
+  "displayName": "Plugin Harness",
+  "version": "0.1.0",
+  "description": "Authoring tool for Claude Code Skills, Claude Code Plugins, and Codex Skills. Bundles three interview-driven skills (plugin-harness, skill-creator, plugin-creator) that emit dual-runtime skill and plugin artifacts per the Agent Skills standard.",
+  "author": {
+    "name": "sh-ai-x",
+    "url": "https://github.com/sh-ai-x"
+  },
+  "repository": "https://github.com/sh-ai-x/plugin-harness",
+  "license": "UNLICENSED",
+  "_license_comment": "The repository currently ships without a LICENSE file (per README §Status). Field set to 'UNLICENSED' explicitly; will be updated when a license is added.",
+  "keywords": [
+    "authoring",
+    "claude-skills",
+    "codex-skills",
+    "plugins",
+    "interview-driven",
+    "tdd",
+    "dual-runtime",
+    "agent-skills"
+  ],
+  "skills": "./skills/",
+  "commands": "./commands/",
+  "hooks": {}
+}

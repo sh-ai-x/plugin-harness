@@ -44,26 +44,16 @@ def test_register_codex_is_idempotent() -> None:
 
 
 def test_skill_matches_bundled_reference() -> None:
-    """Emitted SKILL.md matches the bundled reference resolved at test
-    time via importlib.resources — no on-disk fixture drift (PR #26
-    round 7 🟠 major: previous test_skill_matches_expected_fixture
-    compared against the bundled source resolved at test time via
-    importlib.resources (with editable-install fallback), so the
-    test pins against the real reference rather than a checked-in
-    byte-identical copy (PR #26 round 7).
+    """Emitted SKILL.md matches the bundled reference read from the new
+    repo-root skills/ directory (post-marketplace-install model).
+
+    1-skill-creator follow-up: the SKILL.md assets moved from
+    `src/adapter/codex_skills/plugin-harness/SKILL.md` to
+    `skills/plugin-harness/SKILL.codex.md` (Codex layout companion).
+    This test pins the emitted file against the real source.
     """
-    from importlib import resources
-    from src.adapter import codex_skills  # PR #26 round 12: codex_skills/ now has __init__.py at every level; no # type: ignore needed.
-    try:
-        bundled = (
-            resources.files("src.adapter.codex_skills.plugin-harness")
-            .joinpath("SKILL.md")
-            .read_text(encoding="utf-8")
-        )
-    except (ModuleNotFoundError, FileNotFoundError):
-        # Editable install: read from source tree.
-        here = Path(__file__).resolve().parent.parent
-        bundled = (here / "src" / "adapter" / "codex_skills" / "plugin-harness" / "SKILL.md").read_text(encoding="utf-8")
+    here = Path(__file__).resolve().parent.parent
+    bundled = (here / "skills" / "plugin-harness" / "SKILL.codex.md").read_text(encoding="utf-8")
     with tempfile.TemporaryDirectory() as tmp:
         project_dir = Path(tmp)
         register_codex(project_dir)

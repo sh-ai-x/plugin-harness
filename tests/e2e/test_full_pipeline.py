@@ -98,8 +98,11 @@ def test_cc_and_codex_skill_bodies_byte_identical_post_frontmatter():
     """
     here = pathlib.Path(__file__).resolve().parent
     repo_root = here.parents[1]  # tests/e2e -> repo root
-    cc = repo_root / "src" / "adapter" / "cc_skills" / "plugin-harness" / "SKILL.md"
-    cx = repo_root / "src" / "adapter" / "codex_skills" / "plugin-harness" / "SKILL.md"
+    # 1-skill-creator follow-up: SKILL.md assets moved from src/adapter/{cc,codex}_skills/
+    # to repo-root skills/<name>/. The CC layout file is SKILL.md, the Codex layout
+    # companion is SKILL.codex.md. Both share the same body bytes.
+    cc = repo_root / "skills" / "plugin-harness" / "SKILL.md"
+    cx = repo_root / "skills" / "plugin-harness" / "SKILL.codex.md"
     assert cc.is_file(), f"missing: {cc}"
     assert cx.is_file(), f"missing: {cx}"
 

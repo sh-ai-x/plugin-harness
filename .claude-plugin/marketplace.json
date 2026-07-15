@@ -1,0 +1,19 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "sh-ai-x-plugins",
+  "owner": {
+    "name": "sh-ai-x",
+    "url": "https://github.com/sh-ai-x"
+  },
+  "plugins": [
+    {
+      "name": "plugin-harness",
+      "description": "Authoring tool for Claude Code Skills, Claude Code Plugins, and Codex Skills. Three bundled skills (plugin-harness / skill-creator / plugin-creator) plus a /plugin-harness:new slash command.",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/sh-ai-x/plugin-harness",
+        "ref": "main"
+      }
+    }
+  ]
+}
