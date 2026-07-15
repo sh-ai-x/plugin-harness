@@ -137,6 +137,40 @@ interview entirely and produce the same artifacts programmatically.
 
 ## Install
 
+### Recommended — via marketplace (Claude Code)
+
+The repo ships as a Claude Code plugin under
+[`.claude-plugin/plugin.json`](.claude-plugin/plugin.json) with a
+[self-hosted marketplace entry](.claude-plugin/marketplace.json). To
+install plugin-harness in your Claude Code:
+
+```bash
+# one-time — add the marketplace
+claude plugin marketplace add https://github.com/sh-ai-x/plugin-harness
+
+# install the plugin
+claude plugin install plugin-harness
+```
+
+After install, three skills become available as **namespaced slash
+commands**:
+
+- `/plugin-harness:plugin-harness` (or `/plugin-harness` if you installed
+  via skills-directory mode) — the 5-question plugin interview
+- `/plugin-harness:skill-creator` — 3-question skill interview
+- `/plugin-harness:plugin-creator` — plugin + skill bundle
+
+Run `/reload-plugins` after install. To update: `claude plugin update
+plugin-harness`.
+
+Dev-mode install (without marketplace) for plugin-harness contributors:
+
+```bash
+claude --plugin-dir /path/to/plugin-harness/.claude-plugin
+```
+
+### Fallback — pip install (library path only)
+
 ```bash
 python -m pip install -e .
 ```
@@ -144,11 +178,12 @@ python -m pip install -e .
 Requires Python ≥ 3.10. Runtime deps (pinned in `pyproject.toml`):
 `jinja2 >= 3.1, < 4` and `jsonschema >= 4.18, < 5`.
 
-**The install does NOT install a Claude or Codex skill by itself.** The
-`register_*` family is what writes to the runtime skill directories; run it
-explicitly from a Python entry point, a script, or via the CLI's
-adapter mode. The CLI runs the interview + emit but never touches
-`~/.claude/`, `~/.agents/`, or any other user-level runtime path.
+`pip install` does **not** install Claude or Codex skills by itself; it
+only gives you the library API + CLI. To get the bundled skills into a
+runtime skill directory, use the marketplace install above, or call
+`register_cc_skill` / `register_codex_skill` programmatically
+(see "Library API" below). The library install path is for users who
+want to integrate plugin-harness into their own Python tools.
 
 ---
 

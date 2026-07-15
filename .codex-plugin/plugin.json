@@ -1,0 +1,19 @@
+{
+  "name": "plugin-harness",
+  "version": "0.1.0",
+  "description": "Codex-side manifest for plugin-harness. Same skill assets as the Claude Code plugin; Codex reads the same SKILL.md files (one Claude layout SKILL.md and one Codex layout SKILL.codex.md per skill) from the shared ./skills/ directory.",
+  "author": {
+    "name": "sh-ai-x",
+    "url": "https://github.com/sh-ai-x"
+  },
+  "homepage": "https://github.com/sh-ai-x/plugin-harness",
+  "repository": "https://github.com/sh-ai-x/plugin-harness",
+  "license": "UNLICENSED",
+  "keywords": [
+    "codex-skills",
+    "authoring",
+    "interview-driven",
+    "agent-skills"
+  ],
+  "skills": "../skills/"
+}

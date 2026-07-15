@@ -10,8 +10,14 @@ import shutil
 from pathlib import Path
 
 _PACKAGE_DIR = Path(__file__).resolve().parent
+_PROJECT_ROOT = _PACKAGE_DIR.parents[1]  # src/adapter/ -> marketplace-install/ repo root
 _COMMAND_TEMPLATE = _PACKAGE_DIR / "cc_commands" / "plugin-harness.md"
-_SKILL_TEMPLATE = _PACKAGE_DIR / "cc_skills" / "plugin-harness" / "SKILL.md"
+# 1-skill-creator follow-up: skill assets shipped at repo-root skills/<name>/SKILL.md
+# (Claude Code plugin layout per code.claude.com/docs/en/plugins). The package-
+# relative src/adapter/cc_skills/ path was removed in favor of the marketplace
+# distribution model — the `register_cc_skill` function is now a dev-repo
+# convenience; the supported install path is `/plugin install plugin-harness`.
+_SKILL_TEMPLATE = _PROJECT_ROOT / "skills" / "plugin-harness" / "SKILL.md"
 
 
 def register_cc(project_dir: Path) -> None:
@@ -59,7 +65,7 @@ def _cc_skill_template(name: str) -> Path:
         raise ValueError(
             f"unknown CC skill {name!r}; expected one of {sorted(_CC_SKILL_ALLOWLIST)}"
         )
-    candidate = _PACKAGE_DIR / "cc_skills" / name / "SKILL.md"
+    candidate = _PROJECT_ROOT / "skills" / name / "SKILL.md"
     if not candidate.is_file():
         raise FileNotFoundError(f"bundled CC skill template not found: {candidate}")
     return candidate
