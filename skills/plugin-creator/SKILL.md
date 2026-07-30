@@ -19,9 +19,7 @@ Use this skill when the user asks to:
 - ship a single artifact that installs identically in both Claude
   Code and Codex
 
-Do not use this skill for skills without a plugin wrapper (use the
-`skill-creator` skill for that) or for maintenance of an existing
-plugin.
+Do not use this skill for maintenance of an existing plugin.
 
 ## Invocation
 

@@ -46,20 +46,17 @@ def run_interview(
     stdin_reader: Optional[StdinReader] = None,
     stdout_writer: Optional[StdoutWriter] = None,
     tool_surface: Optional[ToolSurface] = None,
-    questions: Optional[tuple] = None,
 ) -> InterviewState:
     """Drive an interview against `state`, returning it when complete.
 
-    The 0-mvp behavior (5 questions, hardcoded) is the default. Pass
-    `questions=...` to override the question list — used by the
-    `skill_create` sub-mode (3 questions). `state` is duck-typed:
-    any object with `set_answer(qid, raw)` and `advance()` works.
+    The 5-question plugin schema (src/schema/questions.QUESTIONS) is the
+    only canonical question list; mode dispatch is the only extension
+    point. `state` is duck-typed: any object with `set_answer(qid, raw)`
+    and `advance()` works.
 
     Mode dispatch:
         - "user": reads one line per question via stdin_reader; writes prompt via stdout_writer.
         - "ai-research": asks tool_surface.draft_answer(question, idea) for each question.
-        - "skill_create": registered for registry completeness; cli.py dispatches
-                          directly to run_skill_interview (no per-question dispatch needed).
 
     Either mode raises:
         - ValueError for an unknown mode (programming error, not user input).
@@ -81,10 +78,9 @@ def run_interview(
     if mode not in MODES:
         raise ValueError(f"unknown mode {mode!r}; expected one of {MODES}")
 
-    # 1-skill-creator: allow callers (cli.py, library) to pass an alternate
-    # question list. Defaults to the 0-mvp QUESTIONS so existing callers
-    # are unaffected.
-    q_list = questions if questions is not None else QUESTIONS
+    # 1-skill-creator removal: the alternate-question-list override was
+    # added for skill_create's 3-question schema; with that mode gone,
+    # QUESTIONS is the only canonical question list.
 
     # PR #22 round 12 (🟡 minor): validate per-mode dependencies BEFORE
     # any prompt is emitted. The per-question dispatch raises
@@ -96,7 +92,7 @@ def run_interview(
     if mode == "ai-research" and tool_surface is None:
         raise ValueError("'ai-research' mode requires tool_surface")
 
-    for question in q_list:
+    for question in QUESTIONS:
         _prompt(question, stdout_writer)
 
         # PR #22 round 11 (🟠 major): data-driven per-question dispatch
