@@ -43,7 +43,7 @@ def register_cc(project_dir: Path) -> None:
     shutil.copyfile(_SKILL_TEMPLATE, skill_target)
 
 
-# ---- 1-skill-creator: skill-creator and plugin-creator install siblings ----
+# ---- install siblings for skills bundled alongside plugin-harness ----
 
 from src.adapter.install import atomic_write_text, refuse_if_symlink_chain  # noqa: E402
 
@@ -52,7 +52,7 @@ from src.adapter.install import atomic_write_text, refuse_if_symlink_chain  # no
 # flows into a filesystem path, so unvalidated input enables path traversal.
 # Mirror the Codex adapter's runtime-keyed pattern: only the named skills ship
 # as bundled assets in `src/adapter/cc_skills/` are installable.
-_CC_SKILL_ALLOWLIST = frozenset({"skill-creator", "plugin-creator"})
+_CC_SKILL_ALLOWLIST = frozenset({"plugin-creator"})
 
 
 def _cc_skill_template(name: str) -> Path:
@@ -72,7 +72,7 @@ def _cc_skill_template(name: str) -> Path:
 
 
 def register_cc_skill(name: str, project_dir: Path) -> Path:
-    """Install a CC skill template (skill-creator / plugin-creator) into a project.
+    """Install a CC skill template (plugin-creator) into a project.
 
     Creates (or overwrites):
 

@@ -93,7 +93,7 @@ def test_plugin_manifest_author_has_name(plugin_manifest):
 
 # ---------- plugin.json: semantic — every skill asset is real ----------
 
-SKILL_NAMES = {"plugin-harness", "skill-creator", "plugin-creator"}
+SKILL_NAMES = {"plugin-harness", "plugin-creator"}
 
 
 def test_every_skill_directory_exists():

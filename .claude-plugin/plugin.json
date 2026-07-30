@@ -3,7 +3,7 @@
   "name": "plugin-harness",
   "displayName": "Plugin Harness",
   "version": "0.1.0",
-  "description": "Authoring tool for Claude Code Skills, Claude Code Plugins, and Codex Skills. Bundles three interview-driven skills (plugin-harness, skill-creator, plugin-creator) that emit dual-runtime skill and plugin artifacts per the Agent Skills standard.",
+  "description": "Authoring tool for Claude Code Skills, Claude Code Plugins, and Codex Skills. Bundles two interview-driven skills (plugin-harness, plugin-creator) that emit dual-runtime skill and plugin artifacts per the Agent Skills standard.",
   "author": {
     "name": "sh-ai-x",
     "url": "https://github.com/sh-ai-x"

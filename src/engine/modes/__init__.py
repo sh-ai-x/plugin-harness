@@ -57,7 +57,6 @@ __all__ = [
 _MODES: tuple[str, ...] = (
     "user",
     "ai-research",
-    "skill_create",
 )
 
 
@@ -130,4 +129,3 @@ MODES = _MODES
 # above to avoid circular-import errors.
 from src.engine.modes import user_driven  # noqa: E402, F401  (registers 'user')
 from src.engine.modes import ai_research  # noqa: E402, F401  (registers 'ai-research')
-from src.engine.modes import skill_create  # noqa: E402, F401  (registers 'skill_create')

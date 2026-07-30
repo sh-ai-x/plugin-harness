@@ -102,16 +102,13 @@ def test_emit_plugin_skill_bundle_5q_reuses_0mvp_schema(tmp_path):
     from src.emitter.plugin_skill_bundle import emit_plugin_skill_bundle
     from src.schema.questions import QUESTIONS as PLUGIN_QUESTIONS
     from src.schema.state import InterviewState
-    from src.engine.modes.skill_create import run_skill_interview, SkillInterviewState
 
     state = _complete_state()  # 0-mvp 5-question interview
     plan_md = "# Demo Plugin\n\nTest plan body content here."
     emit_plugin_skill_bundle(state, plan_md, tmp_path, skill_slugs=["demo-skill"])
-    # Sanity: not the same schema as skill_create's 3-question schema.
-    assert PLUGIN_QUESTIONS != __import__("src.skill_schema.prompts", fromlist=["SKILL_QUESTIONS"]).SKILL_QUESTIONS
-    # And the bundle above was produced from a 5-question interview state.
+    # Sanity: the 5-question schema is real and non-empty.
+    assert len(PLUGIN_QUESTIONS) == 5
     assert isinstance(state, InterviewState)
-    assert not isinstance(state, SkillInterviewState)
 
 
 def test_emit_plugin_skill_bundle_no_devkit_substring(tmp_path):

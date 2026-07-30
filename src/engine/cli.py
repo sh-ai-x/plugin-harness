@@ -1,7 +1,7 @@
 """CLI entrypoint for the interview engine.
 
 Usage:
-    python -m src.engine.cli new "<one-line idea>" [--mode user|ai-research|skill_create]
+    python -m src.engine.cli new "<one-line idea>" [--mode user|ai-research]
 
 Exit codes:
     0  — interview completed; final line of stdout is "complete"
@@ -36,8 +36,6 @@ from src.engine.modes import (
     setup_surface,
 )
 from src.engine.modes.user_driven import make_writer  # writer is shared across modes
-from src.engine.modes.skill_create import SkillInterviewState, run_skill_interview
-from src.skill_schema.prompts import SKILL_QUESTIONS
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -61,18 +59,18 @@ def build_parser() -> argparse.ArgumentParser:
         "--mode",
         choices=MODES,
         default="user",
-        help="Interview mode: 'user' (stdin), 'ai-research' (tool surface), or 'skill_create' (3-question skill authoring + dual SKILL.md emission).",
+        help="Interview mode: 'user' (stdin) or 'ai-research' (tool surface).",
     )
     new_cmd.add_argument(
         "--output-dir",
         default=None,
-        help="Output directory for emitted artifacts. For --mode=user/ai-research, emits the plugin.json bundle (+ any --skill-slug); for --mode=skill_create, emits dual SKILL.md files.",
+        help="Output directory for emitted artifacts: writes the plugin.json bundle (+ any --skill-slug) after a successful interview.",
     )
     new_cmd.add_argument(
         "--skill-slug",
         action="append",
         default=[],
-        help="Skill slug name to bundle under both .claude/skills/ and .codex/skills/ inside --output-dir (--mode=user/ai-research only). May be repeated.",
+        help="Skill slug name to bundle under both .claude/skills/ and .codex/skills/ inside --output-dir. May be repeated.",
     )
     return parser
 
@@ -117,12 +115,6 @@ def main(argv: Optional[List[str]] = None) -> int:
         _print(f"invalid choice: {args.mode!r} (choose from {MODES})")
         return 2
 
-    # 1-skill-creator: skill_create runs a 3-question interview and emits
-    # dual SKILL.md files; dispatch BEFORE the 5-question path so it
-    # never accidentally runs through the 0-mvp QUESTIONS list.
-    if args.mode == "skill_create":
-        return _run_skill_create(args)
-
     if args.skill_slug and not args.output_dir:
         _print("--skill-slug requires --output-dir")
         return 2
@@ -157,55 +149,6 @@ def main(argv: Optional[List[str]] = None) -> int:
             emit_plugin_skill_bundle(
                 state, plan_md, Path(args.output_dir), skill_slugs=args.skill_slug
             )
-        except EmitError as exc:
-            _print(f"emit error: {exc}")
-            return 4
-
-    _print("complete")
-    return 0
-
-
-def _run_skill_create(args) -> int:
-    """CLI dispatch for the skill_create sub-mode.
-
-    Runs the 3-question interview and, when --output-dir is provided,
-    emits dual-runtime SKILL.md files. With no --output-dir, exits 0
-    after the interview completes (parity with the 0-mvp behavior of
-    "interview complete; further actions separate").
-
-    Exit codes (PR #40 review fix):
-      0  — interview + (optional) emit complete
-      3  — user aborted via stdin (Ctrl-C / EOF)
-      4  — schema/validation failure on a submitted answer OR emit error
-    """
-    writer = make_writer(None)
-    # skill_create requires a real stdin reader; tests pass one directly.
-    from src.engine.modes.user_driven import default_stdin_reader
-    from src.schema.state import SchemaError, ValidationError
-    reader = default_stdin_reader
-
-    try:
-        state = run_skill_interview(
-            args.idea,
-            stdin_reader=reader,
-            stdout_writer=writer,
-        )
-    except UserAbortError as exc:
-        _print(f"aborted: {exc}")
-        return 3
-    except (SchemaError, ValidationError) as exc:
-        # PR #40 review (🟠 major): SchemaError/ValidationError propagate from
-        # run_skill_interview (no longer masked as UserAbortError). Map to
-        # exit 4 (validation failure) so callers can distinguish user
-        # abort (3) from validation rejection (4).
-        _print(f"incomplete: {exc}")
-        return 4
-
-    if args.output_dir is not None:
-        try:
-            from pathlib import Path
-            from src.emitter.skill import emit_skill, EmitError
-            emit_skill(state, Path(args.output_dir))
         except EmitError as exc:
             _print(f"emit error: {exc}")
             return 4

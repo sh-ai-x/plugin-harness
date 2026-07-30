@@ -26,12 +26,11 @@ Flags:
   Codex-layout plugin (`src/.codex-plugin/plugin.json` + `.mcp.json`
   + `src/skills/<slug>/SKILL.md` + `README.md`).
 - `--mode ai-research`: drafts 5 answers via the runtime tool surface.
-- `--mode skill_create`: prompts 3 questions for a standalone SKILL.md
-  pair (Claude + Codex layouts).
-- `--output-dir <dir>`: required for `--mode skill_create`; where to
-  emit files.
+- `--output-dir <dir>`: after a successful interview, emits the
+  plugin.json bundle (+ any `--skill-slug`) into this directory.
 - `--skill-slug <slug>` (repeatable): bundles a dual-runtime skill
-  alongside the plugin (uses `src/emitter/plugin_skill_bundle.py`).
+  alongside the plugin (uses `src/emitter/plugin_skill_bundle.py`);
+  requires `--output-dir`.
 
 ## Exit codes
 
@@ -47,7 +46,7 @@ bundle if `--skill-slug` given).
 
 - The CLI is one UX path; the library is the primary surface. See README
   §Library API for programmatic emission via
-  `src/emitter/{codex,skill,plugin_skill_bundle}.py` and
+  `src/emitter/{codex,plugin_skill_bundle}.py` and
   `src/adapter/{cc,codex}.py`.
 - Reuses the existing plugin-harness engine — no separate entry point.
 - Skill assets bundled here validate against vendored schemas

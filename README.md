@@ -70,9 +70,8 @@ ships one or more of:
 | `settings.json`             | default settings when the plugin is enabled |
 
 Critically, plugin skills are **always namespaced** (`/plugin-name:skill-name`)
-to avoid collisions across plugins. `/plugin-harness:skill-creator` and
-`plugin-harness:plugin-creator` are exactly the kind of namespacing the
-official Plugins docs prescribe.
+to avoid collisions across plugins. `/plugin-harness:plugin-creator` is
+exactly the kind of namespacing the official Plugins docs prescribe.
 
 Test a plugin locally:
 ```bash
@@ -91,9 +90,9 @@ documented but lighter than the Claude Code plugin manifest.
 
 ## What this project produces, exactly
 
-Inputs (one of): a 3-question interview answer set for a skill, a 5-question
-interview answer set for a plugin. **Or, by library call, just a state
-object or a path on disk.**
+Inputs: a 5-question interview answer set for a plugin (optionally with
+one or more `--skill-slug` bundled skills). **Or, by library call, just
+a state object or a path on disk.**
 
 Artifacts emitted (validated in-memory against vendored schemas before
 any file lands — see `src/skill_schema/validator.py`):
@@ -126,11 +125,11 @@ discovers the skills automatically (per the description frontmatter) and
 the user can invoke them via `/<name>`.
 
 The interview-driven flows in `src/engine/cli.py` (`--mode=user`,
-`--mode=ai-research`, `--mode=skill_create`, `--skill-slug <slug>`) are
-**one UX path** for authoring skill/plugin content — useful for non-coders.
-The CLI does not redefine skills or plugins; it produces files in the same
-shape those runtimes consume. Library callers (`src.assembler.plan`,
-`src.emitter.{codex,skill,plugin_skill_bundle}`, `src.adapter.*`) skip the
+`--mode=ai-research`, `--skill-slug <slug>`) are **one UX path** for
+authoring skill/plugin content — useful for non-coders. The CLI does not
+redefine skills or plugins; it produces files in the same shape those
+runtimes consume. Library callers (`src.assembler.plan`,
+`src.emitter.{codex,plugin_skill_bundle}`, `src.adapter.*`) skip the
 interview entirely and produce the same artifacts programmatically.
 
 ---
@@ -143,7 +142,7 @@ marketplace**. The plugin manifest lives at
 marketplace catalog entry is at
 [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json);
 and a parallel Codex-side manifest is at
-[`.codex-plugin/plugin.json`](.codex-plugin/plugin.json). The three
+[`.codex-plugin/plugin.json`](.codex-plugin/plugin.json). The two
 SKILL.md assets ship at repo-root
 [`skills/<name>/SKILL.md`](skills/) (Claude layout) and
 `skills/<name>/SKILL.codex.md` (Codex layout companion).
@@ -211,15 +210,14 @@ claude plugin install plugin-harness
 > `claude plugin install`.
 
 The CLI clones the repo (or pulls a vendored copy) and registers
-`plugin-harness` with Claude Code. After install, three skills become
+`plugin-harness` with Claude Code. After install, two skills become
 available as **namespaced slash commands**:
 
 | Slash command | What it does |
 |---|---|
 | `/plugin-harness:plugin-harness` | 5-question plugin interview → Codex-layout plugin |
-| `/plugin-harness:skill-creator` | 3-question skill interview → dual-runtime SKILL.md pair |
 | `/plugin-harness:plugin-creator` | 5-question plugin + dual-runtime skill bundle |
-| `/plugin-harness:new` | Primary CLI entry point: runs the interview engine with the flags you pass (`--mode user` / `--mode=skill_create` / `--mode=ai-research` / `--skill-slug <slug>` / `--output-dir <dir>`) |
+| `/plugin-harness:new` | Primary CLI entry point: runs the interview engine with the flags you pass (`--mode user` / `--mode=ai-research` / `--skill-slug <slug>` / `--output-dir <dir>`) |
 
 Namespacing follows the Claude plugin convention: `<plugin-name>:<skill-name>`
 to avoid collisions across plugins.
@@ -234,10 +232,10 @@ claude plugin reload
 claude plugin list
 # expect a line containing: plugin-harness  <version>  ...
 
-# Confirm all 4 slash commands are visible
+# Confirm all 3 slash commands are visible
 /help
-# search for: /plugin-harness:plugin-harness  /plugin-harness:skill-creator
-#            /plugin-harness:plugin-creator  /plugin-harness:new
+# search for: /plugin-harness:plugin-harness  /plugin-harness:plugin-creator
+#            /plugin-harness:new
 ```
 
 ### 4. Update an existing install
@@ -335,13 +333,12 @@ everyday skill authoring.
 ### Fallback — manual install (no marketplace, no pip)
 
 For users who can't or don't want to use `claude plugin marketplace add`
-yet (offline, CI restrictions, etc.), drop the three SKILL.md files
+yet (offline, CI restrictions, etc.), drop the two SKILL.md files
 into `~/.claude/skills/<name>/` by hand:
 
 ```bash
 # from the plugin-harness repo root
 mkdir -p ~/.claude/skills/plugin-harness
-mkdir -p ~/.claude/skills/skill-creator
 mkdir -p ~/.claude/skills/plugin-creator
 # SECURITY: cp -n preserves any pre-existing SKILL.md in the target
 # directory. If the prior file was installed from a typosquatted
@@ -351,14 +348,13 @@ mkdir -p ~/.claude/skills/plugin-creator
 # ~/.claude/skills/<name>/SKILL.md) before running the loop. To
 # clobber explicitly, replace cp -n with plain cp in the loop.
 cp -n skills/plugin-harness/SKILL.md  ~/.claude/skills/plugin-harness/
-cp -n skills/skill-creator/SKILL.md   ~/.claude/skills/skill-creator/
 cp -n skills/plugin-creator/SKILL.md  ~/.claude/skills/plugin-creator/
 ```
 
 Then `/reload-plugins` in Claude Code. The skills appear as
-`/plugin-harness`, `/skill-creator`, `/plugin-creator` (unprefixed in
-this mode). Note: this is the install path BEFORE the marketplace was
-shipped; the marketplace install supersedes it.
+`/plugin-harness`, `/plugin-creator` (unprefixed in this mode). Note:
+this is the install path BEFORE the marketplace was shipped; the
+marketplace install supersedes it.
 
 **`/plugin-harness:new` is NOT available in the manual install path.**
 That slash command requires the plugin's `commands/new.md` asset, which
@@ -387,7 +383,6 @@ Codex's user-level canonical path is `$HOME/.agents/skills/<name>/` (NOT
 # (README lines 38 and 85-86) are the source of truth for the
 # runtime filename; the dict name is implementation detail.
 mkdir -p "$HOME/.agents/skills/plugin-harness"
-mkdir -p "$HOME/.agents/skills/skill-creator"
 mkdir -p "$HOME/.agents/skills/plugin-creator"
 # cp -n skips overwriting by default (no-clobber, portable across
 # macOS + Linux, no TTY required). Symlink-source guard: refuse to
@@ -396,14 +391,14 @@ mkdir -p "$HOME/.agents/skills/plugin-creator"
 # the src only — a parent-walk would be stronger but requires more
 # shell; documenting the src-only scope is the minimum-viable
 # hardening.
-for s in plugin-harness skill-creator plugin-creator; do
+for s in plugin-harness plugin-creator; do
   src="skills/$s/SKILL.codex.md"
   [ -L "$src" ] && { echo "refusing to copy from symlink: $src" >&2; continue; }
   cp -n "$src" "$HOME/.agents/skills/$s/SKILL.md"
 done
 
-# repo-level install (project-scoped, what `/skill-creator` in Codex reads)
-for s in plugin-harness skill-creator plugin-creator; do
+# repo-level install (project-scoped, what `/plugin-creator` in Codex reads)
+for s in plugin-harness plugin-creator; do
   mkdir -p ".agents/skills/$s"
   src="skills/$s/SKILL.codex.md"
   [ -L "$src" ] && { echo "refusing to copy from symlink: $src" >&2; continue; }
@@ -412,7 +407,7 @@ done
 ```
 
 Then restart Codex. The skills become invocable as `$plugin-harness`,
-`$skill-creator`, `$plugin-creator`.
+`$plugin-creator`.
 
 ### Troubleshooting
 
@@ -433,38 +428,26 @@ Producing skill/plugin content directly, no CLI:
 
 ```python
 from pathlib import Path
-from src.engine.modes.skill_create import SkillInterviewState, run_skill_interview
-from src.emitter.skill import emit_skill
+from src.schema.state import InterviewState
 from src.emitter.plugin_skill_bundle import emit_plugin_skill_bundle
 from src.adapter.cc import register_cc_skill
 from src.adapter.codex import register_codex_skill
 
-# 1. Author a SKILL.md pair via the 3-question interview.
-state = SkillInterviewState()
-state.set_answer("purpose",          "A description of what the skill does")
-state.advance()
-state.set_answer("examples",         "One or two concrete usage examples")
-state.advance()
-state.set_answer("success-criteria", "Acceptance criteria for the done state")
-state.advance()
-
-# 2. Emit to a temp directory — atomic; no files written on validation failure.
-result = emit_skill(state, Path("/tmp/my-skill"))
-print(result.cc_path, result.codex_path)
-
-# 3. OR: emit a plugin + dual-runtime skill bundle via the 5-question flow.
-from src.schema.state import InterviewState
+# 1. Fill the 5-question plugin interview state.
 plugin_state = InterviewState()
 # ... fill 5 answers ...
 
-emit_plugin_skill_bundle(
+# 2. Emit a plugin + dual-runtime skill bundle. Atomic — no files
+#    written on validation failure.
+result = emit_plugin_skill_bundle(
     plugin_state, "# Plan\nbody", Path("/tmp/my-plugin"),
     skill_slugs=["intake-form", "followup-email"],
 )
+print(result.cc_skill, result.codex_skill)
 
-# 4. Install a bundled skill into the Claude + Codex runtime directories.
-register_cc_skill("skill-creator",  Path("."))   # -> .claude/skills/skill-creator/SKILL.md
-register_codex_skill("skill-creator", Path(".")) # -> .codex/skills/skill-creator/SKILL.md
+# 3. Install a bundled skill into the Claude + Codex runtime directories.
+register_cc_skill("plugin-creator",  Path("."))   # -> .claude/skills/plugin-creator/SKILL.md
+register_codex_skill("plugin-creator", Path(".")) # -> .codex/skills/plugin-creator/SKILL.md
 ```
 
 Validating an existing SKILL.md against the vendored schema:
@@ -517,33 +500,6 @@ src/skills/<slug>/SKILL.md            ← canonical Codex-skill layout
 README.md                            ← assembled idea plan
 ```
 
-### Skill authoring (Claude + Codex skill, 3 questions)
-
-The `--mode=skill_create` flow runs the **3-question skill interview**
-(`purpose` / `examples` / `success-criteria`) and emits two SKILL.md
-files — one in the Claude layout, one in the Codex layout — so the same
-content loads as a Claude Skill via `/<slug>` AND as a Codex Skill via
-`$<slug>`. See the docs links at the top of this README for how each
-runtime consumes these files.
-
-```bash
-python -m src.engine.cli new "<one-line idea>" \
-    --mode=skill_create --output-dir <dir>
-```
-
-Output:
-
-```
-<dir>/.claude/skills/<slug>/SKILL.md      ← Claude Skill format
-<dir>/.codex/skills/<slug>/SKILL.md      ← Codex Skill format (same shape)
-```
-
-Both files share the **body** byte-for-byte (the parity carry-forward);
-only the frontmatter shape is runtime-specific (Codex gets an optional
-`metadata:` block carrying `openai` / `slug` / `dual_runtime` keys).
-Atomically validated before any write commits; a failed validation raises
-`EmitError` and **no file lands on disk**. Idempotent on re-run.
-
 ### Plugin + bundled skill (5Q + dual-runtime skill bundle)
 
 Adding `--skill-slug <slug>` (repeatable) to a normal `plugin-harness new`
@@ -560,25 +516,36 @@ python -m src.engine.cli new "<one-line idea>" \
     --skill-slug intake-form --skill-slug followup-email
 ```
 
+Output per `--skill-slug`:
+
+```
+<dir>/.claude/skills/<slug>/SKILL.md      ← Claude Skill format
+<dir>/.codex/skills/<slug>/SKILL.md      ← Codex Skill format (same shape)
+```
+
+Both files share the **body** byte-for-byte (the parity carry-forward);
+only the frontmatter shape is runtime-specific (Codex gets an optional
+`metadata:` block carrying `openai` / `slug` / `dual_runtime` keys).
+Atomically validated before any write commits; a failed validation raises
+`EmitError` and **no file lands on disk**. Idempotent on re-run.
+
 ### Adapter install from the CLI
 
 The interview + emit runs in process; **adapters do not run automatically.**
-To drop the bundled `skill-creator` and `plugin-creator` skills into a
-project's runtime skill directories:
+To drop the bundled `plugin-creator` skill into a project's runtime
+skill directories:
 
 ```bash
 python -c "
 from pathlib import Path
 from src.adapter.cc import register_cc_skill
 from src.adapter.codex import register_codex_skill
-for n in ('skill-creator', 'plugin-creator'):
-    register_cc_skill(n, Path('.'))
-    register_codex_skill(n, Path('.'))
+register_cc_skill('plugin-creator', Path('.'))
+register_codex_skill('plugin-creator', Path('.'))
 "
 ```
 
-Then in Claude Code: `/skill-creator` and `/plugin-harness:plugin-creator`
-become invocable.
+Then in Claude Code: `/plugin-harness:plugin-creator` becomes invocable.
 
 ---
 
@@ -592,8 +559,8 @@ inputs                     produced artifacts              where they land
                         → src/skills/<slug>/SKILL.md
                         → README.md
 
-3-question skill state  → <dir>/.claude/skills/<slug>/    Claude Code
-                            SKILL.md                     (per code.claude.com)
+5-question plugin state → <dir>/.claude/skills/<slug>/    Claude Code
+  (+ --skill-slug)          SKILL.md                     (per code.claude.com)
                         → <dir>/.codex/skills/<slug>/     Codex
                             SKILL.md                     (per learn.chatgpt.com)
 
@@ -617,12 +584,11 @@ runtime.
 ```
 src/
 ├── schema/         canonical 5-question schema + InterviewState codec
-├── skill_schema/   vendored skill frontmatter schemas + validator + 3-question prompt
-├── engine/         interview runner + CLI; per-mode dispatch (user/ai-research/skill_create)
+├── skill_schema/   vendored skill frontmatter schemas + validator
+├── engine/         interview runner + CLI; per-mode dispatch (user/ai-research)
 ├── assembler/      idea-plan assembly (jinja2)
-├── emitter/        Codex-layout plugin emit + dual-runtime skill emit + dual-skill bundle
+├── emitter/        Codex-layout plugin emit + dual-runtime skill bundle
 │   ├── codex.py                  0-mvp canonical Codex layout
-│   ├── skill.py                  SKILL.md pair (Claude + Codex)
 │   └── plugin_skill_bundle.py    plugin.json + per-arg skill bundle
 └── adapter/        runtime-surface writers
     ├── cc.py       register_cc + register_cc_skill  (installs into .claude/...)
@@ -652,12 +618,10 @@ bash scripts/smoke.sh      # lightweight smoke
 | `tests/test_cc_adapter.py` | Claude Code adapter install surface (0-mvp register_cc) |
 | `tests/test_codex_adapter.py` | Codex adapter install surface (0-mvp register_codex) |
 | `tests/test_skill_schema.py` | vendored skill frontmatter schemas + validator |
-| `tests/test_skill_prompts.py` | 3-question skill_create schema |
-| `tests/test_skill_sub_mode.py` | SkillInterviewState + emit_skill |
 | `tests/test_plugin_sub_mode.py` | emit_plugin_skill_bundle |
 | `tests/test_skill_adapter.py` | register_cc_skill + register_codex_skill |
 | `tests/e2e/test_dual_runtime_parity.py` | CC body byte-equal Codex body (kill condition) |
-| `tests/e2e/test_skill_creator_e2e.py` | end-to-end smoke |
+| `tests/e2e/test_plugin_creator_e2e.py` | end-to-end smoke |
 | `tests/e2e/test_full_pipeline.py` | full 5Q pipeline end-to-end |
 | `tests/e2e/test_smoke.py` | cross-runtime parity smoke |
 | `tests/test_worktree_guard.py` | dev-kit worktree-guard regressions |

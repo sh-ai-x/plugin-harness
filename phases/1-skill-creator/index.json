@@ -23,12 +23,14 @@
       "step": 1,
       "name": "skill-sub-mode",
       "title": "skill-creator: 3-question interview + dual SKILL.md emitter",
-      "status": "completed",
+      "status": "unimplemented",
       "ambiguity_delta": -2.0,
       "started_at": "2026-07-14T21:14:00+0900",
       "completed_at": "2026-07-14T21:30:00+0900",
       "duration_seconds": 960.0,
-      "summary": "Added mode=skill_create via registry (no forking). src/skill_schema/prompts.py (3Q) + src/engine/modes/skill_create.py + SkillInterviewState + src/emitter/skill.py emit_skill() + cli.py dispatch. tests/test_skill_sub_mode.py (11 tests) + tests/test_skill_prompts.py (7 tests) all pass."
+      "summary": "Added mode=skill_create via registry (no forking). src/skill_schema/prompts.py (3Q) + src/engine/modes/skill_create.py + SkillInterviewState + src/emitter/skill.py emit_skill() + cli.py dispatch. tests/test_skill_sub_mode.py (11 tests) + tests/test_skill_prompts.py (7 tests) all pass.",
+      "removed_at": "2026-07-30T00:00:00+0900",
+      "removal_note": "Feature removed end-to-end (source, tests, skill bundle, install allowlists, docs) per /dev-kit:feat-remove; see PR removing skills/skill-creator/. Phase kept as historical record; not deleted."
     },
     {
       "step": 2,

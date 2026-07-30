@@ -53,11 +53,10 @@ def _bundled_skill_via_filesystem() -> Path | None:
     return candidate if candidate.is_file() else None
 
 
-# ---- 1-skill-creator: skill-creator / plugin-creator install siblings ----
+# ---- install siblings for skills bundled alongside plugin-harness ----
 
 _CODEX_SKILL_REL_PATHS = {
     # name → relative install path under the project root
-    "skill-creator": Path(".codex/skills/skill-creator/SKILL.md"),
     "plugin-creator": Path(".codex/skills/plugin-creator/SKILL.md"),
 }
 
@@ -71,7 +70,7 @@ def _read_codex_skill(name: str) -> str:
 
 
 def register_codex_skill(name: str, project_dir: Path) -> Path:
-    """Install a Codex skill template (skill-creator / plugin-creator) into a project.
+    """Install a Codex skill template (plugin-creator) into a project.
 
     Creates (or overwrites):
 
