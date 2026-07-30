@@ -66,13 +66,13 @@ def build_parser() -> argparse.ArgumentParser:
     new_cmd.add_argument(
         "--output-dir",
         default=None,
-        help="Output directory for emitted artifacts (skill_create only). Required for skill_create when stdin is not a TTY.",
+        help="Output directory for emitted artifacts. For --mode=user/ai-research, emits the plugin.json bundle (+ any --skill-slug); for --mode=skill_create, emits dual SKILL.md files.",
     )
     new_cmd.add_argument(
         "--skill-slug",
         action="append",
         default=[],
-        help="Skill slug name to bundle under both .claude/skills/ and .codex/skills/ inside --output-dir (plugin_create only). May be repeated.",
+        help="Skill slug name to bundle under both .claude/skills/ and .codex/skills/ inside --output-dir (--mode=user/ai-research only). May be repeated.",
     )
     return parser
 
@@ -147,6 +147,19 @@ def main(argv: Optional[List[str]] = None) -> int:
     except InterviewIncompleteError as exc:
         _print(f"incomplete: {exc}")
         return 4
+
+    if args.output_dir is not None:
+        try:
+            from pathlib import Path
+            from src.assembler.plan import assemble
+            from src.emitter.plugin_skill_bundle import emit_plugin_skill_bundle, EmitError
+            plan_md = assemble(state)
+            emit_plugin_skill_bundle(
+                state, plan_md, Path(args.output_dir), skill_slugs=args.skill_slug
+            )
+        except EmitError as exc:
+            _print(f"emit error: {exc}")
+            return 4
 
     _print("complete")
     return 0
