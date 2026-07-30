@@ -162,6 +162,49 @@ def test_cli_user_mode_dispatches_to_user_handler(monkeypatch, capsys):
     assert seen["has_writer"] is True
 
 
+def test_cli_user_mode_with_output_dir_emits_plugin_bundle(tmp_path, capsys):
+    """--mode=user with --output-dir/--skill-slug must emit plugin.json +
+    dual-runtime SKILL.md files, not silently no-op (issue #49)."""
+    output_dir = tmp_path / "out"
+    code = _run_with_stdin(
+        [
+            "new", "test idea", "--mode", "user",
+            "--output-dir", str(output_dir),
+            "--skill-slug", "demo-skill",
+        ],
+        "\n".join(VALID_INPUT_LINES) + "\n",
+    )
+    assert code == 0
+    captured = capsys.readouterr()
+    assert "complete" in captured.out
+    assert (output_dir / "src" / ".codex-plugin" / "plugin.json").exists()
+    assert (output_dir / "src" / ".mcp.json").exists()
+    assert (output_dir / ".claude" / "skills" / "demo-skill" / "SKILL.md").exists()
+    assert (output_dir / ".codex" / "skills" / "demo-skill" / "SKILL.md").exists()
+
+
+def test_cli_user_mode_without_skill_slug_still_emits_plugin_json(tmp_path, capsys):
+    """--output-dir alone (no --skill-slug) still emits the canonical 0-mvp files."""
+    output_dir = tmp_path / "out"
+    code = _run_with_stdin(
+        ["new", "test idea", "--mode", "user", "--output-dir", str(output_dir)],
+        "\n".join(VALID_INPUT_LINES) + "\n",
+    )
+    assert code == 0
+    assert (output_dir / "src" / ".codex-plugin" / "plugin.json").exists()
+
+
+def test_cli_user_mode_no_output_dir_does_not_write_files(tmp_path, capsys, monkeypatch):
+    """Without --output-dir, user mode stays a pure interview (no filesystem writes)."""
+    monkeypatch.chdir(tmp_path)
+    code = _run_with_stdin(
+        ["new", "test idea", "--mode", "user"],
+        "\n".join(VALID_INPUT_LINES) + "\n",
+    )
+    assert code == 0
+    assert list(tmp_path.iterdir()) == []
+
+
 def test_cli_ai_research_mode_does_not_consume_stdin(monkeypatch, capsys):
     """ai-research must not block on stdin; we leave it empty and the run still completes."""
     seen = {}
